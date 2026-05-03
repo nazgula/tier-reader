@@ -12,8 +12,11 @@ flowchart LR
     BENCH["Benchmark harness<br/>(phase 3)"]
   end
 
-  subgraph Packages
-    REACT["@tier-reader/react<br/>renderer"]
+  subgraph Display["Display layer"]
+    REACT["@tier-reader/react<br/>renderer (JSX over RenderPlan)"]
+  end
+
+  subgraph Engine["Engine (UI-free, Node + browser)"]
     CC["context-compiler<br/>route + compile"]
     CORE["@tier-reader/core<br/>schema · decompose · renderAt"]
   end
