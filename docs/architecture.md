@@ -2,6 +2,41 @@
 
 Live map of how the system is wired. Updated by `/finish-phase` as components land. See `specs/mission.md` and `specs/tech-stack.md` for *why*; this doc is *what and where*.
 
+## 0. High-level flow
+
+```mermaid
+flowchart LR
+  subgraph Consumers
+    EXT["Chrome extension<br/>(phase 5)"]
+    NPM["NPM consumer apps<br/>(any TS app)"]
+    BENCH["Benchmark harness<br/>(phase 3)"]
+  end
+
+  subgraph Packages
+    REACT["@tier-reader/react<br/>renderer"]
+    CC["context-compiler<br/>route + compile"]
+    CORE["@tier-reader/core<br/>schema · decompose · renderAt"]
+  end
+
+  subgraph External
+    AISDK["Vercel AI SDK<br/>(or BYO call)"]
+    ANTH["Anthropic API"]
+    LF["Langfuse cloud<br/>(traces)"]
+  end
+
+  EXT --> REACT
+  NPM --> CC
+  NPM --> CORE
+  BENCH --> CC
+  REACT --> CORE
+  CC --> CORE
+  CORE --> AISDK
+  AISDK --> ANTH
+  CORE -. trace .-> LF
+```
+
+Detailed topology (extension internals, dependency direction) follows in §1–§3.
+
 ## 1. System topology
 
 ```
