@@ -1,0 +1,1 @@
+The HTTP cache uses a two-tier strategy. The memory tier holds recent responses for fast retrieval and is bounded by an LRU policy. The disk tier persists larger payloads across restarts and is bounded by total bytes. Reads check memory first, then fall back to disk, then to the network. Writes populate both tiers when a response is cacheable per the response headers.

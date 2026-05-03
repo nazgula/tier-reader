@@ -1,0 +1,1 @@
+Reading dense text well is mostly a navigation problem. Most of what an author writes is scaffolding for the few sentences that carry real load. The reader who can find those sentences quickly extracts more value per minute than one who reads linearly. Tools that surface structure before content let you choose where to invest attention.

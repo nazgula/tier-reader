@@ -1,0 +1,1 @@
+A good code review checks four things. First, correctness: does the change do what it claims, and are the edge cases handled. Second, clarity: will a future reader understand the code without archaeology. Third, scope: is the change focused, or does it bundle unrelated work. Fourth, risk: what could break, and is the blast radius acceptable.
