@@ -73,8 +73,6 @@ Locked decisions for the engine. Full schema lives in `docs/schema.md`; function
 
 ## Open questions
 
-- [phase 1] **Node version target** — pin to current LTS (22) at repo scaffold, or older for compat? Default plan: Node 22 LTS unless something forces otherwise.
-- [phase 1] **Vitest browser mode** — needed for engine + react package tests, or are jsdom unit tests enough? Decide when first test that needs it is written.
 - [phase 3] **NPM scope and final package names** — `@tier-reader/core` tentative; verify scope availability and pick before publish.
 - [phase 3] **License (MIT vs Apache 2.0)** — must be decided before phase 3 publish gate. Default leaning: MIT.
 - [phase 3] **Langfuse free-tier limits + retention** — confirm volume + retention adequate when wiring traces; not a foundation question.
