@@ -20,6 +20,18 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 
 ---
 
+## Phase 1.5 — Visual playground + prompt-quality iteration
+
+- [ ] `apps/playground/` — local Vite + React app wrapping `decompose()` with a tree view (paste-in input, depth slider via `renderAt`, raw JSON pane).
+- [ ] BYOK in the playground (env var or local input field; not committed).
+- [ ] Use the playground to iterate the decompose prompt against the existing 5 fixtures plus ad-hoc inputs.
+- [ ] Resolve the three Phase 1 prompt-quality issues so they no longer reproduce: redundant nesting, parent/child paraphrase, over-division of cohesive "X but Y" statements.
+- [ ] Lock improved prompt + any schema tweaks back into `@tier-reader/core`; existing fixture tests still pass.
+
+**Demoable:** `pnpm --filter playground dev` opens the tree-view UI; the three known prompt-quality issues no longer reproduce on the existing fixtures.
+
+---
+
 ## Phase 2 — Engine large-text strategy
 
 - [ ] `detectTier(input)` — picks small / medium / large from input size and model context window.
@@ -90,8 +102,6 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 - **Web Store listing for the extension.** Pull in if the extension proves valuable enough to share.
 - **Cross-section rebalance pass for large-text strategy.** Pull in if chunk-boundary seams prove visibly bad.
 - **Multi-language source support.** Pull in when a non-English use case appears.
-- **Visual playground app for prompt iteration.** Local Vite + React app at `apps/playground/` wrapping `decompose()` with a tree view, so prompt tuning has visual feedback before phase 5's full React renderer. Strong Phase 1.5 candidate at next `/replan`.
-- **Decompose prompt + tier-structure quality iteration.** Open thread from Phase 1: live runs on long inputs (Wikipedia "Matter" article) showed redundant nesting, parent/child paraphrase, and over-division of cohesive "X but Y" statements. Several rounds of prompt edits improved but did not resolve. Pick up once the playground exists so iteration has fast visual feedback.
 
 ## Open questions
 
