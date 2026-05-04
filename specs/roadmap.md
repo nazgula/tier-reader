@@ -91,6 +91,7 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 - **Cross-section rebalance pass for large-text strategy.** Pull in if chunk-boundary seams prove visibly bad.
 - **Multi-language source support.** Pull in when a non-English use case appears.
 - **Visual playground app for prompt iteration.** Local Vite + React app at `apps/playground/` wrapping `decompose()` with a tree view, so prompt tuning has visual feedback before phase 5's full React renderer. Strong Phase 1.5 candidate at next `/replan`.
+- **Decompose prompt + tier-structure quality iteration.** Open thread from Phase 1: live runs on long inputs (Wikipedia "Matter" article) showed redundant nesting, parent/child paraphrase, and over-division of cohesive "X but Y" statements. Several rounds of prompt edits improved but did not resolve. Pick up once the playground exists so iteration has fast visual feedback.
 
 ## Open questions
 
