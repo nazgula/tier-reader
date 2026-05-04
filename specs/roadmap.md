@@ -90,6 +90,7 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 - **Web Store listing for the extension.** Pull in if the extension proves valuable enough to share.
 - **Cross-section rebalance pass for large-text strategy.** Pull in if chunk-boundary seams prove visibly bad.
 - **Multi-language source support.** Pull in when a non-English use case appears.
+- **Visual playground app for prompt iteration.** Local Vite + React app at `apps/playground/` wrapping `decompose()` with a tree view, so prompt tuning has visual feedback before phase 5's full React renderer. Strong Phase 1.5 candidate at next `/replan`.
 
 ## Open questions
 
