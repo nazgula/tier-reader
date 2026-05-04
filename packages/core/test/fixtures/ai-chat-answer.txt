@@ -1,0 +1,1 @@
+To debounce a function in JavaScript, wrap it so that repeated calls within a short window collapse into a single execution. Create a closure holding a timer id. On each call, clear the previous timer and schedule a new one that invokes the wrapped function after the delay. The result is a function that only fires once the caller stops invoking it for the configured interval.

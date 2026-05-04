@@ -1,0 +1,213 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`decompose() — snapshots > ai-chat-answer: stable tree shape 1`] = `
+[
+  {
+    "children": [
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.0",
+        "kind": "definition",
+        "title": "A debounced wrapper merges burst calls into one execution that fires after the caller goes quiet.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.1",
+        "kind": "procedure",
+        "title": "Implementation uses a closure that holds the pending timer id across invocations.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.2",
+        "kind": "procedure",
+        "title": "Each call clears the prior timer and schedules a new one for the wrapped function.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.3",
+        "kind": "claim",
+        "title": "Net effect is one execution per quiet period after activity stops.",
+      },
+    ],
+    "hasDetail": false,
+    "id": "0",
+    "kind": "procedure",
+    "title": "Debouncing wraps a function so rapid repeated calls collapse into a single delayed execution.",
+  },
+]
+`;
+
+exports[`decompose() — snapshots > list-heavy: stable tree shape 1`] = `
+[
+  {
+    "children": [
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.0",
+        "kind": "claim",
+        "title": "Code review covers four dimensions, applied together rather than in isolation.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.1",
+        "kind": "claim",
+        "title": "Correctness asks whether the change does what it claims and handles edge cases.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.2",
+        "kind": "claim",
+        "title": "Clarity asks whether a future reader can follow the code without git archaeology.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.3",
+        "kind": "claim",
+        "title": "Scope asks whether the change is focused or smuggles unrelated work alongside.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.4",
+        "kind": "claim",
+        "title": "Risk asks what could break and whether the blast radius is acceptable.",
+      },
+    ],
+    "hasDetail": false,
+    "id": "0",
+    "kind": "claim",
+    "title": "Good code review evaluates correctness, clarity, scope, and risk of the change.",
+  },
+]
+`;
+
+exports[`decompose() — snapshots > short-essay: stable tree shape 1`] = `
+[
+  {
+    "children": [
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.0",
+        "kind": "claim",
+        "title": "Effective reading of dense material is fundamentally a navigation problem, not a parsing one.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.1",
+        "kind": "claim",
+        "title": "Most prose is scaffolding around a small number of load-bearing sentences.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.2",
+        "kind": "claim",
+        "title": "Readers who locate load-bearing sentences quickly extract more value per minute.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.3",
+        "kind": "claim",
+        "title": "Tools that show structure before content let readers allocate attention deliberately.",
+      },
+    ],
+    "hasDetail": false,
+    "id": "0",
+    "kind": "claim",
+    "title": "Reading dense text efficiently is a navigation problem solved by surfacing structure first.",
+  },
+]
+`;
+
+exports[`decompose() — snapshots > tech-doc-snippet: stable tree shape 1`] = `
+[
+  {
+    "children": [
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.0",
+        "kind": "claim",
+        "title": "Two-tier design splits responsibility between fast in-memory and durable on-disk storage.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.1",
+        "kind": "claim",
+        "title": "Memory tier holds recent responses for low-latency reads, bounded by an LRU policy.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.2",
+        "kind": "claim",
+        "title": "Disk tier persists larger payloads across restarts, bounded by a total-bytes cap.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.3",
+        "kind": "procedure",
+        "title": "Reads probe memory, then disk, then fall through to the network on miss.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.4",
+        "kind": "procedure",
+        "title": "Writes populate both tiers when response headers permit caching.",
+      },
+    ],
+    "hasDetail": false,
+    "id": "0",
+    "kind": "definition",
+    "title": "HTTP cache uses memory and disk tiers, checked in order, with bounded eviction policies.",
+  },
+]
+`;
+
+exports[`decompose() — snapshots > wikipedia-paragraph: stable tree shape 1`] = `
+[
+  {
+    "children": [
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.0",
+        "kind": "definition",
+        "title": "Matter is any substance with mass and volume, excluding massless phenomena like light.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.1",
+        "kind": "claim",
+        "title": "Quantum Level: Particles lack inherent size; fermions claim space via exclusion.",
+      },
+      {
+        "children": [],
+        "hasDetail": true,
+        "id": "0.2",
+        "kind": "narrative",
+        "title": "Particulate theory of matter originated in ancient Greece and India.",
+      },
+    ],
+    "hasDetail": false,
+    "id": "0",
+    "kind": "definition",
+    "title": "Matter: Mass-bearing substance made of atoms; ranges from solid to plasma.",
+  },
+]
+`;

@@ -8,13 +8,13 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 
 ## Phase 1 — Engine core (small-tier decomposition)
 
-- [ ] Repo scaffold: pnpm + Turborepo workspace, Vitest, Biome, Node 22 target.
-- [ ] `@tier-reader/core` package with schema types per `docs/schema.md`.
-- [ ] One-shot `decompose()` for small-tier inputs (fits one context window).
-- [ ] Vercel AI SDK adapter + BYO escape hatch behind a thin internal provider interface.
-- [ ] Langfuse trace wiring around all LLM calls.
-- [ ] Decompose prompt iteration: 5+ test inputs of varied shape (Wikipedia paragraph, AI chat answer, technical doc snippet); assertions on tree validity + spot-check title quality.
-- [ ] `renderAt()` helper for tier-reader-style depth-controlled rendering.
+- [x] Repo scaffold: pnpm + Turborepo workspace, Vitest, Biome, Node 22 target.
+- [x] `@tier-reader/core` package with schema types per `docs/schema.md`.
+- [x] One-shot `decompose()` for small-tier inputs (fits one context window).
+- [x] Vercel AI SDK adapter + BYO escape hatch behind a thin internal provider interface.
+- [x] Langfuse trace wiring around all LLM calls.
+- [x] Decompose prompt iteration: 5+ test inputs of varied shape (Wikipedia paragraph, AI chat answer, technical doc snippet); assertions on tree validity + spot-check title quality.
+- [x] `renderAt()` helper for tier-reader-style depth-controlled rendering.
 
 **Demoable:** `pnpm test` passes; `examples/decompose-cli.ts` takes stdin and prints a tree.
 
@@ -90,10 +90,9 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 - **Web Store listing for the extension.** Pull in if the extension proves valuable enough to share.
 - **Cross-section rebalance pass for large-text strategy.** Pull in if chunk-boundary seams prove visibly bad.
 - **Multi-language source support.** Pull in when a non-English use case appears.
+- **Visual playground app for prompt iteration.** Local Vite + React app at `apps/playground/` wrapping `decompose()` with a tree view, so prompt tuning has visual feedback before phase 5's full React renderer. Strong Phase 1.5 candidate at next `/replan`.
 
 ## Open questions
 
-- [phase 1] **Eval methodology for title quality** — fixture-based snapshot tests, LLM-as-judge, or both? Decide when prompt iteration starts.
-- [phase 1] **Where does the original `tier-reader.jsx` prototype live during phases 1–4?** — keep as `apps/playground/` for reference, or delete after phase 5? Default: keep until phase 5 deletes it.
 - [phase 3] **Benchmark dataset sourcing** — handcrafted 20 messages vs adapted from DACS paper. Adapted = more comparable to prior work; handcrafted = faster.
 - [phase 3] **Steering-accuracy judge model** — which Claude model judges? Default: Sonnet (judge ≠ benchmarked-by-default).
