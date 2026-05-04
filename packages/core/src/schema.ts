@@ -51,18 +51,6 @@ export const STARTER_KINDS = [
   "procedure",
 ] as const;
 
-export const RawNodeSchema: z.ZodType<RawNode> = z.lazy(() =>
-  z.object({
-    title: z.string().min(1),
-    detail: z.string().optional(),
-    kind: z.string().optional(),
-    kindSuggestion: z.string().optional(),
-    tags: z.array(z.string()).optional(),
-    entities: z.array(z.string()).optional(),
-    children: z.array(RawNodeSchema).optional(),
-  }),
-);
-
 export interface RawNode {
   title: string;
   detail?: string;
@@ -73,8 +61,43 @@ export interface RawNode {
   children?: RawNode[];
 }
 
-export const RawTreeSchema = z.object({
-  roots: z.array(RawNodeSchema).min(1),
-});
+export interface RawTree {
+  roots: RawNode[];
+}
 
-export type RawTree = z.infer<typeof RawTreeSchema>;
+/**
+ * JSON-Schema-friendly finite-depth Raw schema. Recursion is unrolled to MAX_DEPTH
+ * so AI SDK's structured-output translation produces a concrete schema (not `any`),
+ * giving the model a proper hint about nested shape. Runtime trees deeper than this
+ * are not rejected — the validator stops describing structure beyond MAX_DEPTH and
+ * lets `z.unknown()` accept whatever arrives.
+ */
+const MAX_SCHEMA_DEPTH = 4;
+
+const baseFields = {
+  title: z.string().min(1),
+  detail: z.string().optional(),
+  kind: z.string().optional(),
+  kindSuggestion: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  entities: z.array(z.string()).optional(),
+} as const;
+
+function buildRawNodeSchema(depth: number): z.ZodType<RawNode> {
+  if (depth <= 0) {
+    return z.object({
+      ...baseFields,
+      children: z.array(z.unknown()).optional(),
+    }) as unknown as z.ZodType<RawNode>;
+  }
+  return z.object({
+    ...baseFields,
+    children: z.array(buildRawNodeSchema(depth - 1)).optional(),
+  }) as unknown as z.ZodType<RawNode>;
+}
+
+export const RawNodeSchema: z.ZodType<RawNode> = buildRawNodeSchema(MAX_SCHEMA_DEPTH);
+
+export const RawTreeSchema: z.ZodType<RawTree> = z.object({
+  roots: z.array(RawNodeSchema).min(1),
+}) as unknown as z.ZodType<RawTree>;

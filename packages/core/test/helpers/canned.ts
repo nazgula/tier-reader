@@ -10,33 +10,49 @@ export function loadFixture(name: string): string {
   return readFileSync(resolve(fixturesDir, `${name}.txt`), "utf8");
 }
 
+/**
+ * Returns the raw text of paragraph N from wikipedia-paragraph.txt, including the
+ * trailing blank-line separator (so concat across all paragraphs reconstructs the
+ * source under whitespace normalization).
+ */
+function loadParagraphRaw(idx: number): string {
+  const src = loadFixture("wikipedia-paragraph");
+  const parts = src.split(/(\n\s*\n)/); // keep separators
+  // parts: [p0, sep, p1, sep, p2, ...]
+  const paragraphIndices: number[] = [];
+  for (let i = 0; i < parts.length; i += 2) paragraphIndices.push(i);
+  const start = paragraphIndices[idx];
+  if (start === undefined) throw new Error(`paragraph ${idx} not found`);
+  const sep = parts[start + 1] ?? "";
+  return (parts[start] ?? "") + sep;
+}
+
 export const CANNED: Record<string, RawTree> = {
   "wikipedia-paragraph": {
     roots: [
       {
-        title:
-          "Photosynthesis converts light into chemical energy in plant chloroplasts, releasing oxygen.",
+        title: "Matter: Mass-bearing substance made of atoms; ranges from solid to plasma.",
         kind: "definition",
-        tags: ["biology"],
+        tags: ["physics"],
         children: [
           {
             title:
-              "Photosynthesis is the energy-conversion process plants use to turn light into chemical bonds.",
-            detail:
-              "Photosynthesis is the process by which plants convert light energy into chemical energy.",
+              "Matter is any substance with mass and volume, excluding massless phenomena like light.",
+            detail: loadParagraphRaw(0),
             kind: "definition",
           },
           {
             title:
-              "The reaction runs inside chloroplasts, organelles that house the green pigment chlorophyll.",
-            detail: " It occurs in chloroplasts, organelles containing the pigment chlorophyll.",
+              "Quantum Level: Particles lack inherent size; fermions claim space via exclusion.",
+            detail: loadParagraphRaw(1),
             kind: "claim",
-            entities: ["chloroplasts", "chlorophyll"],
+            entities: ["fermions", "quarks", "leptons"],
           },
           {
-            title: "Glucose is produced and oxygen is released as a byproduct of the reaction.",
-            detail: " The process produces glucose and releases oxygen as a byproduct.",
-            kind: "claim",
+            title: "Particulate theory of matter originated in ancient Greece and India.",
+            detail: loadParagraphRaw(2),
+            kind: "narrative",
+            entities: ["kaṇāda", "leucippus", "democritus"],
           },
         ],
       },
