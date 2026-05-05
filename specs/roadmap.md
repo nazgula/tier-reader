@@ -43,6 +43,17 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 
 ---
 
+## Phase 2.5 — Agent tactics deep dive (research + experimentation)
+
+- [ ] Survey prior art: hierarchical summarization, semantic chunking, DACS, progressive disclosure research, related agentic strategies for long-document understanding.
+- [ ] Prototype 2–3 alternative tactics for medium/large decomposition (e.g. retrieval-then-decompose, iterative refinement, structured map-reduce variants).
+- [ ] Compare tactics on the playground against shared fixtures; capture qualitative + token/latency notes.
+- [ ] Decide which tactic(s) graduate into the engine; fold winners into `core` or document why none did.
+
+**Demoable:** short writeup in `specs/phase-2_5-.../findings.md` with side-by-side tree comparisons; engine updated (or explicitly unchanged with rationale).
+
+---
+
 ## Phase 3 — Context-compiler library + benchmark + NPM publish
 
 - [ ] `context-compiler` package: `route(tree, agent)` and `compile(nodes, budget, format)` over the engine.
