@@ -1,8 +1,8 @@
 # Phase 1.5 — Plan
 
-Status: 1 [ ], 2 [ ], 3 [ ], 4 [ ], 5 [ ]
+Status: 1 [x], 2 [x], 3 [x], 4 [ ], 5 [ ]
 
-## 1. [ ] `apps/playground/` workspace scaffold
+## 1. [x] `apps/playground/` workspace scaffold
 
 - `apps/playground/package.json` — name `@tier-reader/playground`, private, type module. Deps: `react`, `react-dom`, `@tier-reader/core` (workspace), `vite`, `@vitejs/plugin-react`, `typescript`, `@types/react`, `@types/react-dom`.
 - `apps/playground/vite.config.ts` — React plugin + a small custom plugin that registers the `/api/decompose` middleware (group 2).
@@ -11,7 +11,7 @@ Status: 1 [ ], 2 [ ], 3 [ ], 4 [ ], 5 [ ]
 - `pnpm-workspace.yaml` already covers `apps/*` — verify and run `pnpm install`.
 - Root `package.json` script: `pnpm dev:playground` → `pnpm --filter @tier-reader/playground dev`.
 
-## 2. [ ] `/api/decompose` Vite middleware
+## 2. [x] `/api/decompose` Vite middleware
 
 - `apps/playground/server/decompose-route.ts` — accepts `POST` with JSON `{ input: string, opts?: {...} }`, calls `decompose()` from `@tier-reader/core` using the AI SDK provider with `ANTHROPIC_API_KEY` from `process.env`, returns the `Tree` JSON. 4xx on missing key / bad input; 5xx with error text on provider failure.
 - Wired into Vite via `configureServer(server) { server.middlewares.use('/api/decompose', handler) }` in `vite.config.ts`.
@@ -19,7 +19,7 @@ Status: 1 [ ], 2 [ ], 3 [ ], 4 [ ], 5 [ ]
 - A second `GET /api/fixtures` route returns the list of fixture filenames from `packages/core/test/fixtures/` (resolved via `import.meta.url`) so the UI fixture picker doesn't hardcode paths.
 - `GET /api/fixtures/:name` returns the raw fixture text.
 
-## 3. [ ] Playground UI
+## 3. [x] Playground UI
 
 - `src/App.tsx` — single-page layout with three regions:
   - **Input pane (left):** fixture `<select>` populated from `/api/fixtures`, `<textarea>` bound to its content, "Decompose" button, status text.
