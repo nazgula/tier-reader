@@ -20,15 +20,14 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 
 ---
 
-## Phase 1.5 — Visual playground + prompt-quality iteration
+## Phase 1.5 — Visual playground + structure-respect opt
 
-- [ ] `apps/playground/` — local Vite + React app wrapping `decompose()` with a tree view (paste-in input, depth slider via `renderAt`, raw JSON pane).
-- [ ] BYOK in the playground (env var or local input field; not committed).
-- [ ] Use the playground to iterate the decompose prompt against the existing 5 fixtures plus ad-hoc inputs.
-- [ ] Resolve the three Phase 1 prompt-quality issues so they no longer reproduce: redundant nesting, parent/child paraphrase, over-division of cohesive "X but Y" statements.
-- [ ] Lock improved prompt + any schema tweaks back into `@tier-reader/core`; existing fixture tests still pass.
+- [x] `apps/playground/` — local Vite + React app wrapping `decompose()` with three-mode (Discovery / Overview / Full) tree view, click-to-toggle drill-down, raw JSON pane.
+- [x] Dev-only API key handling: `ANTHROPIC_API_KEY` lives in `.env.local` on the Node side; never reaches the browser.
+- [x] `DecomposeOpts.respectStructure` opt + UI checkbox: when on, the prompt instructs the model to honor source paragraphs / sections / lists as units. Default off; existing snapshots unchanged.
+- Deeper prompt iteration (parent/child paraphrase, over-division of "X but Y", structure-respect edge cases) reframed as perpetual work in `core/src/prompt.ts`, not phase-bound. Engine is decoupled from consumers via the locked `Tree` schema.
 
-**Demoable:** `pnpm --filter playground dev` opens the tree-view UI; the three known prompt-quality issues no longer reproduce on the existing fixtures.
+**Demoable:** `pnpm --filter @tier-reader/playground dev` opens the playground; ticking "respect source structure" and decomposing the 3-paragraph Wikipedia fixture produces one top-level subtree per source paragraph (no cross-paragraph splits).
 
 ---
 

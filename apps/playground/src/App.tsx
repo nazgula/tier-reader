@@ -1,17 +1,20 @@
-import type { Tree } from "@tier-reader/core";
-import { renderAt } from "@tier-reader/core/render";
-import { useEffect, useMemo, useState } from "react";
+import type { Node, NodeId, Tree } from "@tier-reader/core";
+import { useEffect, useState } from "react";
 import { fetchDecompose, fetchFixture, fetchFixtures } from "./api.js";
+
+type ViewMode = "discovery" | "overview" | "full";
 
 export function App() {
   const [fixtures, setFixtures] = useState<string[]>([]);
   const [selected, setSelected] = useState<string>("");
   const [input, setInput] = useState<string>("");
   const [tree, setTree] = useState<Tree | null>(null);
-  const [depth, setDepth] = useState(2);
+  const [viewMode, setViewMode] = useState<ViewMode>("overview");
+  const [overrides, setOverrides] = useState<Map<NodeId, boolean>>(new Map());
   const [status, setStatus] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [showJson, setShowJson] = useState(false);
+  const [respectStructure, setRespectStructure] = useState(false);
 
   useEffect(() => {
     fetchFixtures()
@@ -40,8 +43,9 @@ export function App() {
     setStatus("decomposing…");
     const t0 = performance.now();
     try {
-      const t = await fetchDecompose(input);
+      const t = await fetchDecompose(input, { respectStructure });
       setTree(t);
+      setOverrides(new Map());
       setStatus(`decomposed in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
     } catch (e) {
       setStatus(`decompose: ${(e as Error).message}`);
@@ -50,12 +54,28 @@ export function App() {
     }
   }
 
-  const plan = useMemo(() => {
-    if (!tree) return [];
-    const rootId = tree.rootIds[0];
-    if (!rootId) return [];
-    return renderAt(tree, rootId, depth);
-  }, [tree, depth]);
+  function changeMode(m: ViewMode) {
+    setViewMode(m);
+    setOverrides(new Map());
+  }
+
+  function defaultExpanded(depth: number): boolean {
+    if (viewMode === "discovery") return false;
+    if (viewMode === "full") return true;
+    return depth === 0;
+  }
+
+  function isExpanded(node: Node): boolean {
+    const ov = overrides.get(node.id);
+    if (ov !== undefined) return ov;
+    return defaultExpanded(node.depth);
+  }
+
+  function toggle(nodeId: NodeId, current: boolean) {
+    const next = new Map(overrides);
+    next.set(nodeId, !current);
+    setOverrides(next);
+  }
 
   return (
     <div className="layout">
@@ -81,6 +101,14 @@ export function App() {
               {busy ? "…" : "Decompose"}
             </button>
           </div>
+          <label className="opt">
+            <input
+              type="checkbox"
+              checked={respectStructure}
+              onChange={(e) => setRespectStructure(e.target.checked)}
+            />
+            <span>respect source structure (paragraphs, sections)</span>
+          </label>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -91,18 +119,38 @@ export function App() {
 
         <section className="pane tree-pane">
           <div className="row">
-            <label>
-              Depth: {depth}
-              <input
-                type="range"
-                min={0}
-                max={6}
-                value={depth}
-                onChange={(e) => setDepth(Number(e.target.value))}
-              />
-            </label>
+            <div className="mode-group" role="tablist" aria-label="display level">
+              {(["discovery", "overview", "full"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="tab"
+                  aria-selected={viewMode === m}
+                  className={viewMode === m ? "mode active" : "mode"}
+                  onClick={() => changeMode(m)}
+                >
+                  {m[0]?.toUpperCase()}
+                  {m.slice(1)}
+                </button>
+              ))}
+            </div>
+            <span className="hint">click any title to toggle</span>
           </div>
-          <TreeView tree={tree} plan={plan} />
+          {tree ? (
+            <ul className="tree">
+              {tree.rootIds.map((rid) => (
+                <NodeView
+                  key={rid}
+                  tree={tree}
+                  nodeId={rid}
+                  isExpanded={isExpanded}
+                  onToggle={toggle}
+                />
+              ))}
+            </ul>
+          ) : (
+            <p className="empty">No tree yet.</p>
+          )}
         </section>
 
         <section className="pane json-pane">
@@ -116,30 +164,50 @@ export function App() {
   );
 }
 
-function TreeView({
+function NodeView({
   tree,
-  plan,
+  nodeId,
+  isExpanded,
+  onToggle,
 }: {
-  tree: Tree | null;
-  plan: ReturnType<typeof renderAt>;
+  tree: Tree;
+  nodeId: NodeId;
+  isExpanded: (node: Node) => boolean;
+  onToggle: (nodeId: NodeId, current: boolean) => void;
 }) {
-  if (!tree) return <p className="empty">No tree yet.</p>;
+  const node = tree.nodes[nodeId];
+  if (!node) return null;
+  const expanded = isExpanded(node);
+  const hasChildren = node.hasChildren;
+
   return (
-    <ul className="tree">
-      {plan.map(({ nodeId, indent, showDetail }) => {
-        const node = tree.nodes[nodeId];
-        if (!node) return null;
-        return (
-          <li
-            key={nodeId}
-            style={{ paddingLeft: `${indent * 1.25}rem` }}
-            className={node.hasChildren ? "branch" : "leaf"}
-          >
-            <span className="title">{node.title}</span>
-            {showDetail && node.detail && <div className="detail">{node.detail}</div>}
-          </li>
-        );
-      })}
-    </ul>
+    <li
+      style={{ paddingLeft: `${node.depth * 1.25}rem` }}
+      className={hasChildren ? "branch" : "leaf"}
+    >
+      <button
+        type="button"
+        className="title-btn"
+        onClick={() => onToggle(nodeId, expanded)}
+        aria-expanded={expanded}
+      >
+        <span className={`chevron ${expanded ? "open" : ""}`}>▾</span>
+        <span className="title">{node.title}</span>
+      </button>
+      {expanded && hasChildren && (
+        <ul className="tree">
+          {(node.childIds ?? []).map((cid) => (
+            <NodeView
+              key={cid}
+              tree={tree}
+              nodeId={cid}
+              isExpanded={isExpanded}
+              onToggle={onToggle}
+            />
+          ))}
+        </ul>
+      )}
+      {expanded && !hasChildren && node.detail && <div className="detail">{node.detail}</div>}
+    </li>
   );
 }

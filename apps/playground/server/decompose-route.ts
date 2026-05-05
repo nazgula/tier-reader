@@ -43,7 +43,11 @@ export function decomposeApiPlugin(): Plugin {
             });
           }
           const body = await readBody(req);
-          const parsed = JSON.parse(body) as { input?: unknown; model?: unknown };
+          const parsed = JSON.parse(body) as {
+            input?: unknown;
+            model?: unknown;
+            respectStructure?: unknown;
+          };
           if (typeof parsed.input !== "string" || !parsed.input.trim()) {
             return sendJson(res, 400, { error: "input must be a non-empty string" });
           }
@@ -51,6 +55,9 @@ export function decomposeApiPlugin(): Plugin {
           const tree = await decompose(parsed.input, {
             provider,
             ...(typeof parsed.model === "string" ? { model: parsed.model } : {}),
+            ...(typeof parsed.respectStructure === "boolean"
+              ? { respectStructure: parsed.respectStructure }
+              : {}),
           });
           sendJson(res, 200, { tree });
         } catch (err) {

@@ -1,6 +1,6 @@
 # Phase 1.5 — Plan
 
-Status: 1 [x], 2 [x], 3 [x], 4 [ ], 5 [ ]
+Status: 1 [x], 2 [x], 3 [x], 4 [x], 5 [—]
 
 ## 1. [x] `apps/playground/` workspace scaffold
 
@@ -28,19 +28,17 @@ Status: 1 [x], 2 [x], 3 [x], 4 [ ], 5 [ ]
 - `src/api.ts` — typed `fetchDecompose(input)` and `fetchFixtures()` / `fetchFixture(name)` helpers.
 - Minimal styling — handwritten CSS module or inline styles. No UI library; portfolio bar here is "works for me + screenshots cleanly," nothing more.
 
-## 4. [ ] Prompt iteration on the three known issues
+## 4. [x] `respectStructure` opt + UI checkbox
 
-- Capture a baseline: run all 5 fixtures + 1–2 ad-hoc inputs (Wikipedia "Matter" lead paragraph, an AI-chat answer with an explicit "X but Y" pivot) through the playground; note where each of the three issues fires.
-- Iterate `packages/core/src/prompt.ts` (and decompose call options if needed) — likely additions: explicit "do not paraphrase the parent in a single child," "do not split contrast/concession statements that share a single claim," "if a node has only one child, fold it into the parent." Keep diff in `prompt.ts` only; no schema change unless absolutely required.
-- After each edit, re-run the same fixtures in the playground; iterate until manual eyeball shows none of the three patterns on the 5 fixtures + ad-hoc inputs.
-- Keep a short log inline in `requirements.md`'s "Open questions" if anything surprising surfaces (e.g. a schema tweak that turned out necessary).
+- Add `respectStructure?: boolean` to `DecomposeOpts` in `core/src/decompose.ts` (default `false`).
+- Extend `buildDecomposePrompt` in `core/src/prompt.ts` with a clause that, when on, instructs the model to honor source structural units (paragraphs, heading-marked sections, lists) and lets the 3–6 top-level floor yield to structure.
+- Thread the flag through `apps/playground/server/decompose-route.ts` and `apps/playground/src/api.ts`.
+- Add a checkbox to the playground UI; default off.
+- No snapshot refresh — existing fixture snapshots assume `respectStructure: false` (the default), so they stay valid.
 
-## 5. [ ] Lock prompt + refresh `MockProvider` canned outputs
+## 5. [—] Deeper prompt iteration — perpetual
 
-- With the new prompt locked in, run `RUN_LIVE=1 pnpm --filter @tier-reader/core test --testNamePattern=live` (or the equivalent of phase 1's live-refresh path) to regenerate canned outputs for the 5 fixtures.
-- Update snapshots: `pnpm --filter @tier-reader/core test -u`.
-- Re-run `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build` — all green.
-- Spot-check the snapshot diff: titles changed in expected ways, structure obeys the new constraints.
+Reframed as perpetual work, not phase-bound. Future commits to `core/src/prompt.ts` address parent/child paraphrase, over-division of cohesive "X but Y," and any structure-respect edge cases that surface during further testing. Engine is decoupled from downstream consumers via the locked `Tree` schema, so prompt evolution doesn't ripple. The playground (now landed) is the iteration tool.
 
 ## Architecture impact
 

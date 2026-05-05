@@ -13,11 +13,18 @@ export async function fetchFixture(name: string): Promise<string> {
   return r.text();
 }
 
-export async function fetchDecompose(input: string, model?: string): Promise<Tree> {
+export async function fetchDecompose(
+  input: string,
+  opts: { model?: string; respectStructure?: boolean } = {},
+): Promise<Tree> {
   const r = await fetch("/api/decompose", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ input, ...(model ? { model } : {}) }),
+    body: JSON.stringify({
+      input,
+      ...(opts.model ? { model: opts.model } : {}),
+      ...(opts.respectStructure !== undefined ? { respectStructure: opts.respectStructure } : {}),
+    }),
   });
   const text = await r.text();
   if (!r.ok) {
