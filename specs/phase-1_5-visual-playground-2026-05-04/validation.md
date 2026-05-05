@@ -14,7 +14,7 @@
 
 ## Automated checks
 
-- `pnpm test` — Vitest green across all packages **without refreshing snapshots**. The new `respectStructure` opt defaults to `false`, so existing fixture canned outputs remain valid.
+- `pnpm test` — Vitest green across all packages **without refreshing snapshots**. The new `respectStructure` opt defaults to `false`, so existing fixture canned outputs remain valid. `prompt.test.ts` covers the opt's wiring (clause present iff `respectStructure: true`).
 - `pnpm typecheck` — `tsc --noEmit` clean for `core` and `playground`.
 - `pnpm lint` — Biome clean (including new `apps/playground/` files).
 - `pnpm build` — Turborepo builds all packages; `apps/playground` runs `vite build` cleanly.
