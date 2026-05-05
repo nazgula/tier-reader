@@ -2,10 +2,25 @@ import { STARTER_KINDS } from "./schema.js";
 
 export function buildDecomposePrompt(
   source: string,
-  opts: { maxDepth: number; fanoutHint: [number, number]; starterKinds: readonly string[] },
+  opts: {
+    maxDepth: number;
+    fanoutHint: [number, number];
+    starterKinds: readonly string[];
+    respectStructure?: boolean;
+  },
 ): string {
   const kinds = opts.starterKinds.join(" | ");
-  return `Decompose the following text into a hierarchical tree for progressive disclosure reading.
+  const structureClause = opts.respectStructure
+    ? `
+
+RESPECT SOURCE STRUCTURE
+The source has structural units (headings, paragraphs separated by blank lines, lists). Honor them:
+- A paragraph (text between blank-line breaks) is ONE unit. Do NOT split a paragraph across siblings at the same level. Either keep it whole as one leaf, or place it as a single subtree whose children sub-divide it.
+- Where the source has heading-marked sections, sections are the higher unit and group paragraphs. Do not flatten sections away or merge paragraphs across section boundaries.
+- Lists are units; list items are sub-units.
+- The "3-6 top-level sections" floor below is SUBORDINATE to this rule. If respecting structure means 1 or 2 top-level sections (e.g. a single-paragraph input), that is correct.`
+    : "";
+  return `Decompose the following text into a hierarchical tree for progressive disclosure reading.${structureClause}
 
 TITLE STYLE
 Each "title" is the SHORTEST single sentence that DELIVERS that chunk's actual gist — the reader should LEARN the thing from the title alone, not just learn that the thing exists. Plain language. No "Topic:" prefixes, no labels, no headlines.

@@ -132,7 +132,9 @@ tier-reader/
 │  │  │  ├─ options.tsx
 │  │  │  └─ background.ts
 │  │  └─ test/
-│  └─ playground/                  ← optional, hosts current tier-reader.jsx during phases 1–4
+│  └─ playground/                  ← Vite + React app wrapping decompose() for prompt iteration (dev-only)
+│     ├─ src/                      App.tsx (3-mode tree view + drill-down), api.ts
+│     └─ server/decompose-route.ts /api/decompose + /api/fixtures Vite middleware (Node-side)
 ├─ specs/                          ← constitution (mission, tech-stack, roadmap, per-phase folders)
 ├─ docs/                           ← live docs (this file, schema, api)
 ├─ package.json                    ← pnpm workspace root
@@ -146,10 +148,16 @@ tier-reader/
 
 ```
 apps/extension              → packages/react
+apps/playground             → packages/core (dev-only; Node side via /api/decompose)
 packages/react              → packages/core
 packages/context-compiler   → packages/core
 packages/core               → (no internal deps; only Vercel AI SDK + Langfuse)
 ```
+
+**`@tier-reader/core` package exports:**
+
+- `.` (default) — full surface (`decompose`, providers, `renderAt`, schema). Contains `node:crypto` import; Node-only.
+- `./render` — browser-safe subset (`renderAt` + types). No node-built-in imports; safe for bundlers targeting the browser.
 
 ## Invariants
 
@@ -159,6 +167,7 @@ packages/core               → (no internal deps; only Vercel AI SDK + Langfuse
 - All LLM calls in `core` go through the trace-wrapped provider interface (no direct fetches outside `provider/`).
 - Schema version is the literal `1`; bumping requires a migration note here.
 - `tier-reader.jsx` (root prototype) is *not* on any dependency path of the shipped packages — it's a pre-existing reference until phase 5 supersedes it.
+- The playground's Anthropic API key never reaches the browser. `apps/playground/.env.local` is read by the Vite Node process; `/api/decompose` calls Anthropic server-side and returns only the resulting `Tree`.
 
 ## What this doc tracks going forward
 

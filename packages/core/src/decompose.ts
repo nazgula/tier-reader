@@ -16,6 +16,12 @@ export interface DecomposeOpts {
   maxDepth?: number;
   fanoutHint?: [number, number];
   starterKinds?: readonly string[];
+  /**
+   * When true, the prompt instructs the model to honor source structural units
+   * (paragraphs, sections, lists) — paragraphs are kept whole, sections group
+   * paragraphs, and the 3-6 top-level floor yields to structure. Default false.
+   */
+  respectStructure?: boolean;
   signal?: AbortSignal;
 }
 
@@ -29,7 +35,12 @@ export async function decompose(input: string, opts: DecomposeOpts): Promise<Tre
   const fanoutHint = opts.fanoutHint ?? [3, 7];
   const starterKinds = opts.starterKinds ?? STARTER_KINDS;
 
-  const prompt = buildDecomposePrompt(input, { maxDepth, fanoutHint, starterKinds });
+  const prompt = buildDecomposePrompt(input, {
+    maxDepth,
+    fanoutHint,
+    starterKinds,
+    respectStructure: opts.respectStructure ?? false,
+  });
   const raw = await opts.provider.callStructured(prompt, RawTreeSchema, {
     model,
     signal: opts.signal,
