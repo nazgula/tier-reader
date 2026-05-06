@@ -2,6 +2,16 @@
 
 User-visible changes per phase. Newest first.
 
+## 2026-05-05 — Phase 2: Engine large-text strategy
+
+- `detectTier(input, opts?)` — char-based classifier returning `"small" | "medium" | "large"` with overridable thresholds (defaults: `< 8k` small, `< 40k` medium, `≥ 40k` large). Phase 2.5 may revisit with token-accurate logic.
+- `decompose()` now dispatches by tier; the existing one-shot path is the small case. New `tier`, `tierThresholds`, and `synthesisMerge` opts on `DecomposeOpts` (all additive — small-input behavior unchanged).
+- **Medium tier:** pass-1 outline (titles + char spans) followed by pass-2 per-section small-tier decompose in parallel (concurrency cap 4). Sections stitched as the merged tree's roots.
+- **Large tier:** `chunkByStructure()` splits on markdown headings (fall-back: paragraph packing up to ~15k chars). Chunks decompose sequentially; an LLM synthesis-merge call (default on) re-groups chunk roots into one cohesive 3–7-section top-level outline. With `synthesisMerge: false`, chunk roots become siblings under a synthetic root in source order. Dropped chunks are appended under "Additional content" so source-reconstruction holds.
+- New fixtures: `medium-multi-section.txt` (~10.5KB) and `wikipedia-50k.txt` (~50.5KB). New tests cover tier detection, medium dispatch, large dispatch with merge on/off, and `chunkByStructure` contiguity.
+- Playground: tier badge (predicted-from-input until decompose returns the resolved tier) and a "synthesis merge" checkbox surfaced only when input is large. `/api/decompose` accepts `tier` + `synthesisMerge` and returns `{ tree, tier }`.
+- Architecture doc: new "Seam behavior (large tier)" subsection under Invariants describing what's accepted for v1.
+
 ## 2026-05-05 — Phase 1.5: Visual playground + structure-respect opt
 
 - New `apps/playground/` workspace app — local Vite + React app wrapping `decompose()`. Three-mode tree view (Discovery / Overview / Full) with click-to-toggle drill-down, fixture picker over the existing 5 fixtures, raw-JSON pane.

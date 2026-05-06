@@ -1,14 +1,18 @@
 import { createHash } from "node:crypto";
+import { decomposeLarge } from "./decompose-large.js";
+import { decomposeMedium } from "./decompose-medium.js";
 import { buildDecomposePrompt } from "./prompt.js";
 import type { Provider } from "./provider/index.js";
 import {
   type Node,
   type NodeId,
   type RawNode,
+  type RawTree,
   RawTreeSchema,
   STARTER_KINDS,
   type Tree,
 } from "./schema.js";
+import { type Tier, type TierThresholds, detectTier } from "./tier.js";
 
 export interface DecomposeOpts {
   provider: Provider;
@@ -22,6 +26,16 @@ export interface DecomposeOpts {
    * paragraphs, and the 3-6 top-level floor yields to structure. Default false.
    */
   respectStructure?: boolean;
+  /** Force a specific tier; bypasses detectTier. */
+  tier?: Tier;
+  /** Override default char thresholds for tier detection. */
+  tierThresholds?: Partial<TierThresholds>;
+  /**
+   * Large-tier only: when true (default), an extra LLM call merges the chunk
+   * roots into a single cohesive top-level outline. When false, chunk roots
+   * become siblings under a synthetic root in source order.
+   */
+  synthesisMerge?: boolean;
   signal?: AbortSignal;
 }
 
@@ -31,6 +45,31 @@ export async function decompose(input: string, opts: DecomposeOpts): Promise<Tre
   if (!input.trim()) throw new Error("decompose: input is empty");
 
   const model = opts.model ?? DEFAULT_MODEL;
+  const tier =
+    opts.tier ?? detectTier(input, opts.tierThresholds ? { thresholds: opts.tierThresholds } : {});
+
+  let raw: RawTree;
+  if (tier === "small") {
+    raw = await decomposeSmallRaw(input, opts, model);
+  } else if (tier === "medium") {
+    raw = await decomposeMedium(input, { ...opts, model }, decomposeSmallRaw);
+  } else {
+    raw = await decomposeLarge(input, { ...opts, model }, decomposeSmallRaw);
+  }
+
+  return rawToTree(raw, input, model);
+}
+
+/**
+ * Single-shot decompose against an arbitrary source string. Returns the raw,
+ * un-stitched tree shape so medium/large strategies can compose multiple calls
+ * before final id-walking.
+ */
+export async function decomposeSmallRaw(
+  input: string,
+  opts: DecomposeOpts,
+  model: string,
+): Promise<RawTree> {
   const maxDepth = opts.maxDepth ?? 3;
   const fanoutHint = opts.fanoutHint ?? [3, 7];
   const starterKinds = opts.starterKinds ?? STARTER_KINDS;
@@ -41,12 +80,14 @@ export async function decompose(input: string, opts: DecomposeOpts): Promise<Tre
     starterKinds,
     respectStructure: opts.respectStructure ?? false,
   });
-  const raw = await opts.provider.callStructured(prompt, RawTreeSchema, {
+  return opts.provider.callStructured(prompt, RawTreeSchema, {
     model,
     signal: opts.signal,
     traceName: "decompose",
   });
+}
 
+export function rawToTree(raw: RawTree, source: string, model: string): Tree {
   const nodes: Record<NodeId, Node> = {};
   const rootIds: NodeId[] = [];
 
@@ -59,8 +100,8 @@ export async function decompose(input: string, opts: DecomposeOpts): Promise<Tre
   return {
     rootIds,
     nodes,
-    source: input,
-    sourceHash: hash(input),
+    source,
+    sourceHash: hash(source),
     meta: {
       model,
       createdAt: new Date().toISOString(),
@@ -81,7 +122,6 @@ function walk(
   const hasChildren = children.length > 0;
 
   if (hasChildren && raw.detail !== undefined) {
-    // Non-leaves must not have detail; drop quietly.
     raw.detail = undefined;
   }
 
@@ -118,3 +158,5 @@ function walk(
 function hash(s: string): string {
   return createHash("sha256").update(s).digest("hex").slice(0, 16);
 }
+
+export type DecomposeSmallRawFn = typeof decomposeSmallRaw;

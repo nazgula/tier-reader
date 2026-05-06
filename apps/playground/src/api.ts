@@ -1,4 +1,4 @@
-import type { Tree } from "@tier-reader/core";
+import type { Tier, Tree } from "@tier-reader/core";
 
 export async function fetchFixtures(): Promise<string[]> {
   const r = await fetch("/api/fixtures");
@@ -13,10 +13,20 @@ export async function fetchFixture(name: string): Promise<string> {
   return r.text();
 }
 
+export interface DecomposeResult {
+  tree: Tree;
+  tier: Tier;
+}
+
 export async function fetchDecompose(
   input: string,
-  opts: { model?: string; respectStructure?: boolean } = {},
-): Promise<Tree> {
+  opts: {
+    model?: string;
+    respectStructure?: boolean;
+    tier?: Tier;
+    synthesisMerge?: boolean;
+  } = {},
+): Promise<DecomposeResult> {
   const r = await fetch("/api/decompose", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -24,6 +34,8 @@ export async function fetchDecompose(
       input,
       ...(opts.model ? { model: opts.model } : {}),
       ...(opts.respectStructure !== undefined ? { respectStructure: opts.respectStructure } : {}),
+      ...(opts.tier !== undefined ? { tier: opts.tier } : {}),
+      ...(opts.synthesisMerge !== undefined ? { synthesisMerge: opts.synthesisMerge } : {}),
     }),
   });
   const text = await r.text();
@@ -34,6 +46,6 @@ export async function fetchDecompose(
     } catch {}
     throw new Error(msg);
   }
-  const j = JSON.parse(text) as { tree: Tree };
-  return j.tree;
+  const j = JSON.parse(text) as { tree: Tree; tier: Tier };
+  return { tree: j.tree, tier: j.tier };
 }

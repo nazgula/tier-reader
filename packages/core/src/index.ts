@@ -13,3 +13,10 @@ export { aiSdkProvider } from "./provider/ai-sdk.js";
 export { byoProvider } from "./provider/byo.js";
 export { decompose, type DecomposeOpts } from "./decompose.js";
 export { renderAt } from "./render.js";
+export {
+  detectTier,
+  DEFAULT_TIER_THRESHOLDS,
+  type Tier,
+  type TierThresholds,
+} from "./tier.js";
+export { chunkByStructure, type Chunk } from "./chunk.js";

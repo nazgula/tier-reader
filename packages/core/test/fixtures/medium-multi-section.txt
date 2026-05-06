@@ -1,0 +1,75 @@
+# Introduction
+
+Distributed log aggregation refers to the process of collecting, transporting, and storing structured event records from many independent producers into a central, queryable system. Modern services emit logs at rates that exceed what a single machine can comfortably retain, and the operational cost of losing those logs during incidents is high. Aggregation pipelines therefore optimize for both throughput and durability under load.
+
+This document describes a reference architecture suitable for deployments in the range of one thousand to one hundred thousand events per second. It assumes a heterogeneous fleet of producers (HTTP services, batch jobs, database hosts) and a small number of downstream consumers (search index, cold-storage warehouse, alerting evaluator).
+
+The architecture is intentionally boring: it favors well-understood components, explicit backpressure, and recovery procedures that can be executed by a generalist on-call engineer with twenty minutes of context.
+
+# Producer side
+
+Each producer runs a thin local agent that batches records on disk before forwarding them upstream. Disk-buffering is the linchpin of the design — it decouples producer liveness from upstream availability and absorbs transient outages without dropping records. The agent flushes batches when either the time-since-last-flush exceeds five seconds or the buffer reaches one megabyte, whichever fires first.
+
+Records are serialized as length-prefixed JSON. The length prefix simplifies recovery from partial writes: on agent restart, the tail of the buffer file is scanned for a complete record boundary, and any trailing partial record is discarded. We accept the small replay risk this implies in exchange for a recovery procedure that fits in a single function.
+
+Local rotation policy is straightforward. Once a buffer file reaches one hundred megabytes or twelve hours of age, it is renamed and a new file is opened. Renamed files are eligible for upload; the upload coordinator chooses the oldest unsent file first, ensuring that backlogged records drain in order.
+
+Producers do not perform schema validation. The agent's job is to move bytes durably; schema concerns belong to the central pipeline, where they can be evolved without redeploying the entire fleet.
+
+# Transport
+
+The transport layer is a horizontally scalable shard set. Each agent uses a stable hash of its hostname to pick a primary shard, with a deterministic fallback to the next shard on transport failure. This sticky-but-failover scheme balances load reasonably while preserving locality during normal operation.
+
+The protocol is HTTP/2 with mutual TLS. We prefer HTTP/2 over a custom binary protocol because every operations team already understands its failure modes — connection resets, slow-loris, head-of-line blocking — and the marginal performance loss is well within our budget.
+
+Each shard maintains a write-ahead log on local NVMe storage. Writes are acknowledged only after the WAL fsync returns. The shard then asynchronously replicates the log to two follower shards in a different rack. Replication is best-effort during normal load and synchronous when the primary is under repair, providing a tunable durability/latency tradeoff.
+
+Shard failure handling assumes the failed shard's data may be unavailable for hours. Producers do not retry against a failed primary indefinitely; instead, after three consecutive failures within a thirty-second window, an agent fails over to its fallback shard and emits a metric that operators can alert on.
+
+# Central indexing
+
+Once records land in a shard's WAL, an indexer process tails the log and writes batches into the search index. The indexer is intentionally separate from the shard process so that index pressure cannot stall ingestion. If the indexer falls behind, the shard's WAL grows; operators size the WAL volume to absorb at least six hours of indexer downtime at peak rates.
+
+Index documents are immutable. Updates to records — for instance, late-arriving trace correlation IDs — are stored as separate documents linked by a join key. This avoids the operational complexity of mutable inverted indexes and pays a small query-time cost in exchange.
+
+The index sharding strategy mirrors the transport sharding strategy. Records that arrive together at a transport shard end up in the same index shard, which preserves locality for the most common query pattern: "give me everything from host X in the last hour."
+
+# Cold storage
+
+Records older than seventy-two hours migrate from the search index to object storage. Cold storage uses Parquet files partitioned by date and service. The migrator is a stand-alone batch job that reads from the WAL replay stream rather than from the index, ensuring that index-only mutations (deletions, redactions) are not silently propagated into archive.
+
+Compression and encoding follow the warehouse team's conventions: ZSTD with a dictionary trained per service, dictionary refreshed weekly. Empirically this reduces storage cost by approximately forty percent over uncompressed Parquet, with negligible query overhead at the analytics layer.
+
+# Operational properties
+
+Failure modes are well understood and intentionally narrow. The three documented loss vectors are: agent crash with un-fsynced data in memory (bounded by buffer flush interval, typically tens of milliseconds); shard catastrophic failure before WAL replication completes (bounded by the replication lag, typically sub-second); and indexer corruption (bounded by WAL retention, typically hours).
+
+Backpressure is explicit at every stage. Agents that cannot upload quickly enough simply pause local production hooks, surfacing the back-pressure signal to the producing application. Applications that ignore the signal and continue emitting records will eventually fill local disk and crash; this is a deliberate choice favoring loud failure over silent loss.
+
+Alerting is structured around the contracts each component publishes. The transport layer publishes "records acknowledged per second" and "WAL replication lag"; the indexer publishes "indexer lag against WAL HEAD"; the migrator publishes "oldest record still in index." Alerts are derived from these contract metrics rather than from internal implementation details.
+
+# Schema evolution
+
+Records are stored as JSON, but the central pipeline enforces a versioned schema at index time. Each producer attaches a schema version field to every record; the indexer consults a schema registry to translate older versions into the canonical current shape before writing to the search index. The translation layer is intentionally additive — it can add fields, rename fields, and apply type coercions, but it cannot drop or aggregate fields, since downstream consumers may rely on their continued presence.
+
+Schema changes follow a published lifecycle. Producers begin emitting the new version while continuing to support the old; the schema registry is updated to translate either direction; consumers are migrated to the new shape; and finally, after a deprecation window measured in weeks rather than days, the old version is removed from the registry. The migration window is deliberately long because debugging an incident with logs that have lost their canonical shape is much harder than waiting an extra week before deleting old code.
+
+Schema versions are pinned per service, not per record class, because services rarely change schemas in isolation. A single service typically emits records in a small number of correlated shapes, and tying versioning to the service simplifies operational reasoning at the cost of some unused versions that never see traffic.
+
+# Querying patterns
+
+The search index supports three classes of queries: point lookups by trace ID, range scans over time and host, and full-text search across record bodies. Each pattern has been analyzed for typical latency and resource cost, and the index sharding and indexing strategies are tuned to the relative frequency of each.
+
+Point lookups are the cheapest and most common. Trace IDs are indexed as exact-match keys with no analysis applied, and the typical latency for a point lookup is well under fifty milliseconds even at peak load. Range scans are more expensive but bounded by the natural locality introduced during ingestion; querying for "everything from host X in the last hour" reads from a single index shard and a small contiguous segment of that shard. Full-text search is the most expensive, and operators generally discourage its use except for ad-hoc investigation. Standing queries that rely on full-text matching are flagged for review and migration to a structured field.
+
+The query API exposes streaming results so that user-facing dashboards can render the first page of results before the full query has completed. This avoids the all-or-nothing user experience that a request/response API would impose, and it cooperates well with the underlying segment-by-segment query execution model.
+
+# Capacity planning
+
+Capacity is planned along three axes: producer-side disk for buffering, transport-side disk for the WAL, and indexer-side memory and disk for the search index. Each axis is sized independently, with operators free to add capacity at any layer without affecting the others. This independence is one of the reasons the architecture has held up across an order of magnitude in traffic growth.
+
+Producer-side capacity is sized to absorb at least twelve hours of upstream outage at peak production rates. This allows operators to perform extended maintenance on the transport layer without dropping records, and it absorbs the most common failure modes — single-shard outages, network partitions affecting a region — without operator action.
+
+Transport-side WAL capacity is sized to absorb at least twenty-four hours of indexer downtime at peak rates. The longer horizon reflects the relative likelihood of indexer issues: indexers are stateful in a way that the transport shards are not, and recovery from a corrupt index is measured in hours rather than minutes.
+
+Indexer-side capacity is sized for the rolling seventy-two hour window of hot data, with cold storage absorbing anything older. This window has been adjusted over the years; earlier deployments retained ninety-six hours, but query analysis showed that fewer than one percent of queries reached that far back, and the operational cost of indexer storage exceeds the cost of cold storage by a factor of roughly twenty.

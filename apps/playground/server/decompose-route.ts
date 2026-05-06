@@ -2,7 +2,8 @@ import { readFile, readdir } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { aiSdkProvider, decompose } from "@tier-reader/core";
+import { aiSdkProvider, decompose, detectTier } from "@tier-reader/core";
+import type { Tier } from "@tier-reader/core";
 import type { Plugin } from "vite";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -47,10 +48,17 @@ export function decomposeApiPlugin(): Plugin {
             input?: unknown;
             model?: unknown;
             respectStructure?: unknown;
+            tier?: unknown;
+            synthesisMerge?: unknown;
           };
           if (typeof parsed.input !== "string" || !parsed.input.trim()) {
             return sendJson(res, 400, { error: "input must be a non-empty string" });
           }
+          const explicitTier =
+            parsed.tier === "small" || parsed.tier === "medium" || parsed.tier === "large"
+              ? (parsed.tier as Tier)
+              : undefined;
+          const resolvedTier: Tier = explicitTier ?? detectTier(parsed.input);
           const provider = aiSdkProvider();
           const tree = await decompose(parsed.input, {
             provider,
@@ -58,8 +66,12 @@ export function decomposeApiPlugin(): Plugin {
             ...(typeof parsed.respectStructure === "boolean"
               ? { respectStructure: parsed.respectStructure }
               : {}),
+            ...(explicitTier ? { tier: explicitTier } : {}),
+            ...(typeof parsed.synthesisMerge === "boolean"
+              ? { synthesisMerge: parsed.synthesisMerge }
+              : {}),
           });
-          sendJson(res, 200, { tree });
+          sendJson(res, 200, { tree, tier: resolvedTier });
         } catch (err) {
           sendJson(res, 500, { error: errMsg(err) });
         }
