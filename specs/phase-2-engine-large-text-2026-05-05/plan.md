@@ -6,9 +6,9 @@ type: project
 
 # Plan
 
-Status: 1 [ ], 2 [ ], 3 [ ], 4 [ ], 5 [ ], 6 [ ]
+Status: 1 [x], 2 [x], 3 [x], 4 [x], 5 [x], 6 [x]
 
-## 1. [ ] `detectTier` + tier dispatch
+## 1. [x] `detectTier` + tier dispatch
 
 - Add `packages/core/src/tier.ts` exporting `detectTier(input, opts?) → "small" | "medium" | "large"`.
 - Char-based thresholds with conservative defaults (`small < ~20k`, `medium < ~80k`, `large >= ~80k`); pin exact numbers in code with a one-line comment on rationale.
@@ -17,7 +17,7 @@ Status: 1 [ ], 2 [ ], 3 [ ], 4 [ ], 5 [ ], 6 [ ]
 - Export `detectTier` from `packages/core/src/index.ts`.
 - Smoke test: each existing fixture is classified `small`.
 
-## 2. [ ] Medium tier (outline + parallel sections)
+## 2. [x] Medium tier (outline + parallel sections)
 
 - Add `decomposeMedium(input, opts)` in `decompose.ts` (or a new `decompose-medium.ts`).
 - Pass 1: prompt the model for a top-level outline only (titles + brief, no leaf detail). Reuse `RawTreeSchema` constrained to `maxDepth: 1`, or add a `MediumOutlineSchema` if cleaner.
@@ -27,7 +27,7 @@ Status: 1 [ ], 2 [ ], 3 [ ], 4 [ ], 5 [ ], 6 [ ]
 - Add fixture `medium-multi-section.txt` (~10–20KB).
 - Test: medium fixture round-trips through `decomposeMedium` and produces a valid `Tree` per schema.
 
-## 3. [ ] Large tier (chunk + sequential + synthesis merge)
+## 3. [x] Large tier (chunk + sequential + synthesis merge)
 
 - Add `chunkByStructure(input)` in a new `packages/core/src/chunk.ts`. Strategy: split on markdown ATX headings (`^#{1,6} `); fall back to grouped paragraphs (`\n\n`-separated, packed up to ~15k chars per chunk) when no headings are present. Returns `{ text, sourceStart, sourceEnd }[]`.
 - Add `decomposeLarge(input, opts)` in `decompose.ts` (or `decompose-large.ts`):
@@ -40,20 +40,20 @@ Status: 1 [ ], 2 [ ], 3 [ ], 4 [ ], 5 [ ], 6 [ ]
 - Add fixture `wikipedia-50k.txt` (~50KB Wikipedia article — pick one well-structured topic; capture rendered article text).
 - Tests: large fixture decomposes to a single cohesive `Tree`; with `synthesisMerge: false` produces N chunk roots; with `synthesisMerge: true` produces a single merged top-level outline.
 
-## 4. [ ] Fixtures + cross-tier tests
+## 4. [x] Fixtures + cross-tier tests
 
 - Verify all five existing small fixtures still classify and decompose as before (regression).
 - Add `tier.test.ts` covering threshold edges and overrides.
 - Add cross-tier integration test: same `decompose()` call across small/medium/large fixtures returns valid `Tree`s; only the strategy differs.
 - Update snapshots if any small-path output drifts (it shouldn't).
 
-## 5. [ ] Playground tier surface
+## 5. [x] Playground tier surface
 
 - `apps/playground/server/decompose-route.ts`: pass through optional `tier` and `synthesisMerge` from request body; include the resolved tier (from `detectTier`) in the response so the UI can label it.
 - `apps/playground/src/App.tsx`: add a small tier badge ("small" / "medium" / "large") next to the existing controls; add a "synthesis merge" checkbox that's only visible/active when tier is `large`.
 - Manual: paste a small fixture → small path; paste the 50KB Wikipedia fixture → large path with merge on by default; toggle off and re-run, observe difference in top-level cohesion.
 
-## 6. [ ] Document seam behavior
+## 6. [x] Document seam behavior
 
 - Update `docs/architecture.md` §2 if anything in the runtime workflow has actually changed in shape (the tiered diagram is already there — most likely no change needed).
 - Add a short subsection under Invariants (or a new "Seam behavior" subsection) describing what's accepted for large-tier seams in v1: occasional duplication across chunk boundaries, ordering follows source structure, synthesis merge improves but does not eliminate seams.
