@@ -70,3 +70,47 @@ SOURCE TEXT (verbatim, between <<< and >>>):
 ${source}
 >>>`;
 }
+
+export function buildMediumOutlinePrompt(
+  source: string,
+  opts: { maxDepth: number; fanoutHint: [number, number] },
+): string {
+  const [lo, hi] = opts.fanoutHint;
+  return `You will produce a TOP-LEVEL OUTLINE of the source text — titles only, no detail. A second pass will decompose each section in depth.
+
+OUTLINE STYLE
+- ${lo}-${hi} top-level sections that together cover the entire source, in source order. Roughly one section per heading or major topic shift.
+- Each "title" is the SHORTEST single sentence that DELIVERS that section's gist — the reader should LEARN the thing from the title alone. Plain language. No "Topic:" prefixes.
+
+For each section, return:
+- "title": one info-dense sentence as above.
+- "anchor": a short VERBATIM substring copied EXACTLY from the source — the first line where the section begins. If the section starts at a markdown heading (e.g. "# Introduction"), copy that whole heading line. If there is no heading, copy the first 40-80 characters of the section's first sentence, exactly as written including punctuation and case. The anchor must appear verbatim in the source — we use it to locate the section. Do NOT paraphrase. Do NOT include text from before the section starts.
+
+OUTPUT
+Return JSON matching the provided schema: { sections: { title, anchor }[] }.
+
+SOURCE TEXT (verbatim, between <<< and >>>):
+<<<
+${source}
+>>>`;
+}
+
+export function buildLargeSynthesisPrompt(rootTitles: string[]): string {
+  const numbered = rootTitles.map((t, i) => `[${i}] ${t}`).join("\n");
+  return `You are merging the top-level titles of a long document — produced by decomposing the document chunk by chunk — into ONE cohesive outline. Adjacent titles about the same idea should be grouped together; thematically distinct titles should remain in separate sections.
+
+INPUT — top-level titles (numbered, in source order):
+${numbered}
+
+OUTPUT
+Produce 3-7 merged sections. Each merged section:
+- "title": one info-dense sentence that DELIVERS the section's gist (the reader should LEARN the thing from the title alone). Plain language. Same style as the input titles. Do NOT use placeholders like "Section 1" or "Chunk N" — write a real title that summarizes the grouped content.
+- "rootIndices": array of integers referencing the title numbers above, in source order.
+
+Constraints:
+- EVERY index from 0 to ${rootTitles.length - 1} MUST appear in exactly one merged section.
+- Within a merged section, rootIndices must be in ascending order.
+- Sections themselves must appear in source order (the first index of each section ascends across sections).
+
+Return JSON matching the provided schema: { sections: { title, rootIndices }[] }.`;
+}
