@@ -50,6 +50,12 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 - [ ] Compare tactics on the playground against shared fixtures; capture qualitative + token/latency notes.
 - [ ] Decide which tactic(s) graduate into the engine; fold winners into `core` or document why none did.
 
+**Concrete quality issues observed during Phase 2 validation (2026-05-05) that this phase should address:**
+- Top-level fanout violations: a single root with 12 sub-items where the prompt asks for 3–7. Suggests the soft fanout hint isn't load-bearing under real model behavior; consider fanout enforcement passes or rebalance.
+- Excess nesting on small content: depth-2/3 subtrees on inputs that read more naturally as flat lists. Aligns with the phase 1.5 "depth is a budget, not a target" prompt note — but the prompt alone isn't sufficient.
+- Parent/child paraphrase still appears occasionally despite the explicit "NO REPETITION" prompt section. Worth a dedicated post-pass (collapse-or-promote) experiment.
+- Synthesis-merge titles for the large path: real-content titles work well *now* (post-flatten fix), but cross-section coherence at lower levels still reads as chunk-shaped. Cross-section rebalance experiment lives here per roadmap § Deferred.
+
 **Demoable:** short writeup in `specs/phase-2_5-.../findings.md` with side-by-side tree comparisons; engine updated (or explicitly unchanged with rationale).
 
 ---
@@ -106,7 +112,7 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 
 ## Deferred / Under Evaluation
 
-- **Streaming generation (scaffold-then-fill).** Pull in when extension UX feels slow on large inputs. Architecturally compatible with current schema.
+- **Streaming generation (scaffold-then-fill).** Pull in when extension UX feels slow on large inputs. Architecturally compatible with current schema. **Trigger hit 2026-05-05:** Phase 2 validation showed the playground freezes for the entire 50KB / multi-call decompose run; user flagged this as a real UX problem. Wire format already specified in `docs/schema.md`; `decomposeStream` already drafted in `docs/api.md`. Candidate to slot as Phase 2.6 (before or after 2.5 — see open question below).
 - **Standalone AI-chat-display package.** Pull in if a real consumer use case appears outside the extension.
 - **Server-side API key proxy for the extension.** Pull in only if the extension graduates from personal-use-only.
 - **Web Store listing for the extension.** Pull in if the extension proves valuable enough to share.
@@ -117,3 +123,6 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 
 - [phase 3] **Benchmark dataset sourcing** — handcrafted 20 messages vs adapted from DACS paper. Adapted = more comparable to prior work; handcrafted = faster.
 - [phase 3] **Steering-accuracy judge model** — which Claude model judges? Default: Sonnet (judge ≠ benchmarked-by-default).
+- [phase 2.5/2.6 ordering] **Streaming before or after agent-tactics deep dive?** Streaming makes 2.5 experimentation less painful (no 30-second stares per tactic comparison). 2.5-first means streaming may need rework if winning tactic changes emission shape. Lean: streaming first (largely orthogonal to which tactic wins), but defer the call to /replan.
+- [phase 2.5 / playground] **View-mode design** — playground now ships three reading modes (Frontier / Slice / Verbatim) added 2026-05-05 to play with the user-stated intuition that each layer should read as "the only thing you see." Open whether to graduate this into `@tier-reader/react`'s public surface or keep it playground-only until a clear winner emerges. Also open: behavior of mixed-depth leaves in Slice mode (currently strict — depth-1 leaves don't appear in layer-2 slice; an alternative is "bubble up" so source coverage stays complete).
+- [phase 2.6 / streaming, when picked up] **Mid-flight cancel UX.** Phase 2 validation step 7 (abort a long large-tier run) is not actually wired up — there's no UI cancel and `AbortSignal` plumbing through medium/large multi-call paths is untested. Ties naturally into the streaming work.
