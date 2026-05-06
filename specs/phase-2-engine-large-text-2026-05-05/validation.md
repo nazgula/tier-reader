@@ -32,6 +32,10 @@ type: project
   - 50KB fixture with `synthesisMerge: true` → single top-level outline (one synthetic root or 3–7 merged top nodes).
   - Same fixture with `synthesisMerge: false` → top level equals chunk-root count.
   - Both produce schema-valid `Tree`s; structural ids are consistent (`"0"`, `"0.0"`, `"0.0.0"`, …).
+- New `chunkByStructure()` test:
+  - 50KB Wikipedia fixture splits on markdown headings (≥ 2 chunks; chunk source spans are contiguous and ascending).
+  - Heading-free input falls back to paragraph packing within the per-chunk char budget.
+- Source-reconstruction invariant on the large path: when the synthesis-merge model omits a chunk root, the merged tree appends it under a fallback "Additional content" section so every chunk root reaches the final tree.
 - `pnpm typecheck` (or `tsc --noEmit`) clean across the workspace.
 - `pnpm lint` (Biome) clean.
 
