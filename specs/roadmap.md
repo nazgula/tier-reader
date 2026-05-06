@@ -33,11 +33,11 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 
 ## Phase 2 — Engine large-text strategy
 
-- [ ] `detectTier(input)` — picks small / medium / large from input size and model context window.
-- [ ] **Medium:** outline-then-sections, parallel section decompose.
-- [ ] **Large:** structural chunking + per-chunk decompose + synthesis merge.
-- [ ] Tests with progressively larger fixtures (paragraph → article → multi-section spec).
-- [ ] Document seam behavior at chunk boundaries for the large case.
+- [x] `detectTier(input)` — picks small / medium / large from input size and model context window.
+- [x] **Medium:** outline-then-sections, parallel section decompose.
+- [x] **Large:** structural chunking + per-chunk decompose + synthesis merge.
+- [x] Tests with progressively larger fixtures (paragraph → article → multi-section spec).
+- [x] Document seam behavior at chunk boundaries for the large case.
 
 **Demoable:** engine handles a 50KB Wikipedia article without truncation; `pnpm test` passes against fixtures of all three tiers.
 

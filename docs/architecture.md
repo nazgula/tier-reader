@@ -106,7 +106,10 @@ tier-reader/
 │  ├─ core/                        ← @tier-reader/core
 │  │  ├─ src/
 │  │  │  ├─ schema.ts              types per docs/schema.md
-│  │  │  ├─ decompose.ts           one-shot + tiered dispatch
+│  │  │  ├─ decompose.ts           tier dispatch + small one-shot
+│  │  │  ├─ decompose-medium.ts    outline pass + parallel sections
+│  │  │  ├─ decompose-large.ts     chunk + sequential + synthesis merge
+│  │  │  ├─ chunk.ts               structural chunker (headings → paragraphs)
 │  │  │  ├─ tier.ts                detectTier, small/medium/large
 │  │  │  ├─ render.ts              renderAt
 │  │  │  ├─ provider/
@@ -133,8 +136,8 @@ tier-reader/
 │  │  │  └─ background.ts
 │  │  └─ test/
 │  └─ playground/                  ← Vite + React app wrapping decompose() for prompt iteration (dev-only)
-│     ├─ src/                      App.tsx (3-mode tree view + drill-down), api.ts
-│     └─ server/decompose-route.ts /api/decompose + /api/fixtures Vite middleware (Node-side)
+│     ├─ src/                      App.tsx (3-mode tree view + drill-down + tier badge), api.ts
+│     └─ server/decompose-route.ts /api/decompose (tier + synthesisMerge passthrough; returns resolved tier) + /api/fixtures Vite middleware (Node-side)
 ├─ specs/                          ← constitution (mission, tech-stack, roadmap, per-phase folders)
 ├─ docs/                           ← live docs (this file, schema, api)
 ├─ package.json                    ← pnpm workspace root
@@ -168,6 +171,18 @@ packages/core               → (no internal deps; only Vercel AI SDK + Langfuse
 - Schema version is the literal `1`; bumping requires a migration note here.
 - `tier-reader.jsx` (root prototype) is *not* on any dependency path of the shipped packages — it's a pre-existing reference until phase 5 supersedes it.
 - The playground's Anthropic API key never reaches the browser. `apps/playground/.env.local` is read by the Vite Node process; `/api/decompose` calls Anthropic server-side and returns only the resulting `Tree`.
+- All non-small tiers ultimately produce a single `Tree` with valid structural ids — consumers see no schema-level difference between tiers. Medium and large strategies stitch sub-results before id-walking, so `"0"`, `"0.0"`, `"0.0.0"` invariants always hold.
+
+### Seam behavior (large tier)
+
+The large tier chunks the source on structural boundaries (markdown headings, then paragraph groups), decomposes each chunk independently, then merges. We accept the following for v1:
+
+- **Occasional duplication across chunk boundaries.** A claim that straddles a heading may appear in two adjacent chunks. Cross-section rebalancing is deferred (see roadmap § Deferred).
+- **Source order preserved.** Synthesis merge re-groups chunk roots but never reorders them; `chunkIndices` are required to be ascending. Children appear in source order.
+- **Synthesis merge improves cohesion, does not eliminate seams.** With merge on, the top level reads as one outline; lower levels still reflect chunk-shaped decomposition. With merge off, top-level fanout equals the chunk count under a synthetic root.
+- **No leaf is dropped.** The merge step preserves every chunk root; if the model omits any, they are appended under a fallback "Additional content" section so the source-reconstruction invariant (concat of leaf `detail` ≈ source) holds.
+
+Phase 2.5 evaluates alternative tactics (retrieval-then-decompose, iterative refinement, semantic chunking) and decides which, if any, graduate into the engine.
 
 ## What this doc tracks going forward
 
