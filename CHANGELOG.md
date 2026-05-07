@@ -2,6 +2,15 @@
 
 User-visible changes per phase. Newest first.
 
+## 2026-05-07 — Phase 2.5: Agent tactics deep dive (research + experimentation)
+
+- Surveyed prior art on long-document decomposition and progressive disclosure (hierarchical summarization, RAPTOR, BooookScore, NexusSum, Anthropic context engineering, NN/g progressive disclosure). Findings written up at `specs/phase-2_5-.../findings.md`.
+- Built and then removed a prompt-variant registry: three variants (`v-bubble-up`, `v-paragraph-leaf`, `v-fanout-strict`) on top of a `default` baseline, with `DecomposeOpts.promptVersion` plumbed through small/medium/large strategies. Experiment surfaced the right answer; the registry was unneeded once we knew what to do.
+- **Bug fix:** the pre-2.5 default was dropping each paragraph's opening sentence into the parent title and never emitting it as a leaf — verbatim source-reconstruction was silently broken. Three rules folded into the default prompt fix it: PARAGRAPH-AS-LEAF with verbatim detail, NO PARENT WITH ONE PARAPHRASING CHILD, and "section title must reflect the whole section, not just paragraph 1."
+- New invariant in `docs/architecture.md`: verbatim reconstruction (concatenating leaf `detail` in tree order ≈ source).
+- New manual spotcheck script at `examples/spotcheck-phase-2_5.ts` (`pnpm --filter examples spotcheck:phase-2_5`) decomposes a fixture, dumps the tree to `specs/phase-2_5-.../spotchecks/default.json`, and prints reconstruction Jaccard + single-child smell counts. Last live run: Jaccard 0.992, no smells.
+- Parked for later (roadmap.md → Deferred): bubble-up as a real multi-call pipeline (per-paragraph → per-section synthesis → root); automated live-LLM output-quality tests in CI; runtime reconstruction guard inside `decompose()`.
+
 ## 2026-05-05 — Phase 2: Engine large-text strategy
 
 - `detectTier(input, opts?)` — char-based classifier returning `"small" | "medium" | "large"` with overridable thresholds (defaults: `< 8k` small, `< 40k` medium, `≥ 40k` large). Phase 2.5 may revisit with token-accurate logic.
