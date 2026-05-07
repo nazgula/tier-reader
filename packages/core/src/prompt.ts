@@ -123,4 +123,3 @@ Constraints:
 
 Return JSON matching the provided schema: { sections: { title, rootIndices }[] }.`;
 }
-

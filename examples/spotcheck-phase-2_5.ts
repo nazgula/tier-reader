@@ -11,18 +11,12 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { aiSdkProvider, decompose, type Tree } from "@tier-reader/core";
+import { type Tree, aiSdkProvider, decompose } from "@tier-reader/core";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "..");
-const fixturePath = resolve(
-  repoRoot,
-  "packages/core/test/fixtures/medium-multi-section.txt",
-);
-const outDir = resolve(
-  repoRoot,
-  "specs/phase-2_5-prompt-versions-research-2026-05-07/spotchecks",
-);
+const fixturePath = resolve(repoRoot, "packages/core/test/fixtures/medium-multi-section.txt");
+const outDir = resolve(repoRoot, "specs/phase-2_5-prompt-versions-research-2026-05-07/spotchecks");
 
 function extractSection(source: string, heading: string): string {
   const lines = source.split(/\r?\n/);
@@ -106,7 +100,9 @@ function report(tree: Tree, source: string): void {
   process.stderr.write(`top-level sections : ${tree.rootIds.length}\n`);
   process.stderr.write(`leaves             : ${leaves.length}\n`);
   process.stderr.write(`reconstruction Jacc: ${jaccard.toFixed(3)}  (≥ 0.95 expected)\n`);
-  process.stderr.write(`single-child nodes : ${smells.length === 0 ? "none" : smells.join(", ")}\n`);
+  process.stderr.write(
+    `single-child nodes : ${smells.length === 0 ? "none" : smells.join(", ")}\n`,
+  );
 }
 
 main().catch((err) => {
