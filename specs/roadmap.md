@@ -45,10 +45,10 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 
 ## Phase 2.5 — Agent tactics deep dive (research + experimentation)
 
-- [ ] Survey prior art: hierarchical summarization, semantic chunking, DACS, progressive disclosure research, related agentic strategies for long-document understanding.
-- [ ] Prototype 2–3 alternative tactics for medium/large decomposition (e.g. retrieval-then-decompose, iterative refinement, structured map-reduce variants).
-- [ ] Compare tactics on the playground against shared fixtures; capture qualitative + token/latency notes.
-- [ ] Decide which tactic(s) graduate into the engine; fold winners into `core` or document why none did.
+- [x] Survey prior art: hierarchical summarization, semantic chunking, DACS, progressive disclosure research, related agentic strategies for long-document understanding.
+- [x] Prototype alternative tactics for medium/large decomposition (bubble-up, paragraph-as-leaf, fanout-strict).
+- [x] Compare tactics on shared fixtures; capture qualitative notes; identify a real bug (verbatim reconstruction broken in pre-2.5 default).
+- [x] Decide what graduates: paragraph-as-leaf rule + single-child-collapse rule + section-title-must-cover-whole-section rule folded into the default prompt. Variants and registry torn out — unneeded once the bug was understood.
 
 **Concrete quality issues observed during Phase 2 validation (2026-05-05) that this phase should address:**
 - Top-level fanout violations: a single root with 12 sub-items where the prompt asks for 3–7. Suggests the soft fanout hint isn't load-bearing under real model behavior; consider fanout enforcement passes or rebalance.
@@ -117,6 +117,9 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 - **Server-side API key proxy for the extension.** Pull in only if the extension graduates from personal-use-only.
 - **Web Store listing for the extension.** Pull in if the extension proves valuable enough to share.
 - **Cross-section rebalance pass for large-text strategy.** Pull in if chunk-boundary seams prove visibly bad.
+- **Automated output-quality tests.** Wire the spotcheck checks (verbatim-reconstruction Jaccard, no-single-child-paraphrase) into a live-LLM test job that runs on demand or in CI rather than as a manual script. Pull in when API cost / latency in CI is acceptable, or when prompt edits need a stronger gate than the current manual spotcheck.
+- **Runtime reconstruction guard.** Have `decompose()` compute the leaf-vs-source Jaccard after each LLM call and warn (or throw) below a threshold so the verbatim-reconstruction bug we fixed in phase 2.5 can't silently regress. Pull in if a future prompt edit re-introduces the regression, or before shipping consumer-facing flows where a malformed tree would be hard to debug.
+- **Paragraph-pipeline decompose (bubble-up as a real multi-call pipeline).** Phase-2.5 candidate parked for later. Idea: per-paragraph LLM call → per-section synthesis call → root, mirroring large-tier's chunk → synthesize shape at finer granularity. Total tokens ≈ same as one sweep, but each call is small and focused, which should help quality on documents where the single-sweep model loses focus. Pull in if the consolidated single-sweep default produces weak section titles on real inputs after Phase 2.5.
 - **Multi-language source support.** Pull in when a non-English use case appears.
 
 ## Open questions
