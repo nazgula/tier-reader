@@ -31,3 +31,27 @@ type: project
 - **Tier dispatch**: `detectTier` and the medium/large dispatchers must still pick the same tier and emit the same shape under default. New `promptVersion` plumbing must not leak into tier selection.
 - **Provider wrapper / Langfuse**: adding `promptVersion` to trace metadata must not break the `BYO call()` escape hatch (which has no Langfuse). Verify with the existing BYO test path.
 - **Schema invariants** (structural ids `"0"`, `"0.0"`, leaf-only `detail`, etc.) hold across all variants — variants change *what the model writes*, not the post-processing that enforces schema.
+
+## Reconciliation — what actually shipped (appended at finish-phase)
+
+The original criteria above assumed the variant registry would ship as the deliverable. The mid-phase spotcheck revealed a real bug in the pre-2.5 default (verbatim reconstruction broken), so the registry was used to find the answer and then torn out. The criteria that still apply, plus new ones reflecting the consolidated outcome:
+
+**Still applies:**
+- Existing test suite green; `tsc --noEmit` clean; biome clean.
+- `findings.md` exists with ≥4 prior-art entries.
+- Default decomposition path produces a structurally valid tree across all phase 2 fixtures (no schema regression).
+
+**Superseded / no longer applicable:**
+- "Variant invocable from a script" — variants and `promptVersion` opt removed.
+- "Unknown version errors clearly" — registry removed.
+- Langfuse `promptVersion` metadata — plumbing removed.
+- New structural tests per variant — variant code and tests removed.
+
+**New criteria for the consolidated outcome:**
+- The default prompt in `packages/core/src/prompt.ts` contains the three rules folded in this phase: PARAGRAPH-AS-LEAF, NO PARENT WITH ONE PARAPHRASING CHILD, and the "section title must reflect the whole section" instruction.
+- The spotcheck script `examples/spotcheck-phase-2_5.ts` runs end-to-end against a live API key (sourced from `apps/playground/.env.local` for local dev) and reports:
+  - Reconstruction Jaccard ≥ 0.95 on the "Producer side" fixture.
+  - Zero single-child internal nodes on the "Producer side" fixture.
+- `spotchecks/default.json` is committed and reflects a recent run.
+- `DecomposeOpts` exposes no `promptVersion` field; `@tier-reader/core` exports no registry symbols.
+- `architecture.md` lists "Verbatim reconstruction" as an invariant.
