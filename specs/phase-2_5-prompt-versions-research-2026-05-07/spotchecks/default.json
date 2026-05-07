@@ -1,0 +1,53 @@
+{
+  "rootIds": [
+    "0",
+    "1",
+    "2",
+    "3"
+  ],
+  "nodes": {
+    "0": {
+      "id": "0",
+      "parentId": null,
+      "depth": 0,
+      "index": 0,
+      "title": "Each producer runs a local agent that batches records on disk before forwarding them upstream.",
+      "hasChildren": false,
+      "detail": "Each producer runs a thin local agent that batches records on disk before forwarding them upstream. Disk-buffering is the linchpin of the design — it decouples producer liveness from upstream availability and absorbs transient outages without dropping records. The agent flushes batches when either the time-since-last-flush exceeds five seconds or the buffer reaches one megabyte, whichever fires first."
+    },
+    "1": {
+      "id": "1",
+      "parentId": null,
+      "depth": 0,
+      "index": 1,
+      "title": "Records are serialized as length-prefixed JSON to simplify recovery from partial writes on agent restart.",
+      "hasChildren": false,
+      "detail": "Records are serialized as length-prefixed JSON. The length prefix simplifies recovery from partial writes: on agent restart, the tail of the buffer file is scanned for a complete record boundary, and any trailing partial record is discarded. We accept the small replay risk this implies in exchange for a recovery procedure that fits in a single function."
+    },
+    "2": {
+      "id": "2",
+      "parentId": null,
+      "depth": 0,
+      "index": 2,
+      "title": "Buffer files are rotated when they reach one hundred megabytes or twelve hours of age, and renamed files are uploaded in order.",
+      "hasChildren": false,
+      "detail": "Local rotation policy is straightforward. Once a buffer file reaches one hundred megabytes or twelve hours of age, it is renamed and a new file is opened. Renamed files are eligible for upload; the upload coordinator chooses the oldest unsent file first, ensuring that backlogged records drain in order."
+    },
+    "3": {
+      "id": "3",
+      "parentId": null,
+      "depth": 0,
+      "index": 3,
+      "title": "Producers do not perform schema validation; the agent's job is to move bytes durably, leaving schema concerns to the central pipeline.",
+      "hasChildren": false,
+      "detail": "Producers do not perform schema validation. The agent's job is to move bytes durably; schema concerns belong to the central pipeline, where they can be evolved without redeploying the entire fleet."
+    }
+  },
+  "source": "# Producer side\n\nEach producer runs a thin local agent that batches records on disk before forwarding them upstream. Disk-buffering is the linchpin of the design — it decouples producer liveness from upstream availability and absorbs transient outages without dropping records. The agent flushes batches when either the time-since-last-flush exceeds five seconds or the buffer reaches one megabyte, whichever fires first.\n\nRecords are serialized as length-prefixed JSON. The length prefix simplifies recovery from partial writes: on agent restart, the tail of the buffer file is scanned for a complete record boundary, and any trailing partial record is discarded. We accept the small replay risk this implies in exchange for a recovery procedure that fits in a single function.\n\nLocal rotation policy is straightforward. Once a buffer file reaches one hundred megabytes or twelve hours of age, it is renamed and a new file is opened. Renamed files are eligible for upload; the upload coordinator chooses the oldest unsent file first, ensuring that backlogged records drain in order.\n\nProducers do not perform schema validation. The agent's job is to move bytes durably; schema concerns belong to the central pipeline, where they can be evolved without redeploying the entire fleet.",
+  "sourceHash": "fe2a433547051230",
+  "meta": {
+    "model": "claude-haiku-4-5-20251001",
+    "createdAt": "2026-05-07T08:48:35.550Z",
+    "version": 1
+  }
+}

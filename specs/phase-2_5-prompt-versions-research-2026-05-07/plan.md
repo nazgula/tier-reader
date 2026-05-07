@@ -6,9 +6,9 @@ type: project
 
 # Phase 2.5 — Plan
 
-Status: 1 [ ], 2 [ ], 3 [ ], 4 [ ], 5 [ ]
+Status: 1 [x], 2 [x], 3 [x], 4 [x], 5 [x]
 
-## 1. [ ] Prior-art survey (quick, via subagents — token-budgeted)
+## 1. [x] Prior-art survey (quick, via subagents — token-budgeted)
 
 - **Delegated to subagents** — main context does not perform web research itself. But subagents share the same plan quota (Max x5), so we minimize agent count and per-agent budget rather than fanning out maximally.
 - **Two `general-purpose` agents, run in parallel** (single message, two tool calls), each covering a cluster:

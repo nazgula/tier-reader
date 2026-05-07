@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "decompose": "tsx decompose-cli.ts"
+    "decompose": "tsx decompose-cli.ts",
+    "spotcheck:phase-2_5": "tsx spotcheck-phase-2_5.ts"
   },
   "dependencies": {
     "@tier-reader/core": "workspace:*"

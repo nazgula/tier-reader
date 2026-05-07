@@ -172,6 +172,7 @@ packages/core               → (no internal deps; only Vercel AI SDK + Langfuse
 - `tier-reader.jsx` (root prototype) is *not* on any dependency path of the shipped packages — it's a pre-existing reference until phase 5 supersedes it.
 - The playground's Anthropic API key never reaches the browser. `apps/playground/.env.local` is read by the Vite Node process; `/api/decompose` calls Anthropic server-side and returns only the resulting `Tree`.
 - All non-small tiers ultimately produce a single `Tree` with valid structural ids — consumers see no schema-level difference between tiers. Medium and large strategies stitch sub-results before id-walking, so `"0"`, `"0.0"`, `"0.0.0"` invariants always hold.
+- **Verbatim reconstruction.** Concatenating leaf `detail` in tree order ≈ source (whitespace differences tolerated). The decompose prompt enforces this: a parent title is a *summary* of what's beneath it, not a *replacement* for source text. If the parent title contains content from the source's opening sentence, that sentence must still appear in some leaf's `detail`. Phase-2.5 fixed a regression where the model was dropping each paragraph's opening sentence into the parent title and never emitting it as a leaf.
 
 ### Seam behavior (large tier)
 
