@@ -64,11 +64,13 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 
 - [ ] `context-compiler` package: `route(tree, agent)` and `compile(nodes, budget, format)` over the engine.
 - [ ] Agent spec format: `{ id, domain, tagFilters?, entityFilters? }`.
-- [ ] **Lock `route()` mechanism before benchmarking:** tag/embedding match (deterministic, no orchestrator LLM call) vs LLM-routed (richer matching, costs one extra call per turn). Choice changes what the benchmark measures and what the post can claim. Default lean: tag/embedding match — the "no-orchestrator-LLM" story is a clean differentiator vs DACS.
+- [ ] **`route()` mechanism = hybrid (locked):** hard filters (tag/entity intersection from agent spec) as a deterministic pre-filter, then embedding-similarity ranking (cosine between agent description and subtree title) over the survivors. Threshold tunable; below it a subtree goes to no agent. Filter-only and embedding-only as ablations in the benchmark.
+- [ ] **Cost story (honest):** total LLM calls per turn ≈ 1 + N (same as DACS — DACS pays an orchestrator chat-completion, tier-reader pays for `decompose()`). The win is two-fold: (a) **no chat-model orchestrator call** — routing uses embeddings (~100× cheaper than chat completions) and deterministic filters; (b) **decompose is amortized** — same call powers the human-reader product, and is reusable across agent configurations (DACS must re-orchestrate every time the agent roster changes). Per-agent token counts are smaller because each agent reads its slice, not the whole message.
 - [ ] Tier selection at compile time: walk subtree to budget-fitting depth.
 - [ ] `bullets` and `prose` output formats (prose = linearize titles into paragraphs).
 - [ ] Benchmark harness: 20 multi-domain user messages, agent counts N=3, 5, 10. **Two baselines, not one:** (a) flat-broadcast (full message to every agent) and (b) DACS-style focus mode (full message to one focused agent + 200-token summaries to the rest, re-implemented as a small harness wrapper from arXiv:2604.07911). Beating only flat-broadcast is not a defensible claim in 2026 — DACS is the prior art reviewers will cite.
 - [ ] Measurements: tokens per agent (avg), total tokens across agents, steering accuracy via LLM-as-judge.
+- [ ] Playground: agent-routing pane. Define N agents (id + description + optional tag/entity filters), decompose a multi-topic message, show each agent's slice side-by-side with per-agent token counts. This is the live demo artifact for LinkedIn post #1; the benchmark harness produces the numbers, the playground produces the picture.
 - [ ] Resolve license + NPM scope; publish `@tier-reader/core` + `context-compiler` to NPM.
 
 **Framing for LinkedIn post #1 (Phase 4):** the contribution is **sub-turn-granularity** routing — DACS routes whole agents in/out of focus; tier-reader decomposes one user turn into a clause-tree and routes subtrees. Different unit, sharper benchmark.
