@@ -10,3 +10,6 @@ coverage/
 .env.*.local
 .vscode/
 .idea/
+
+# Local-only notes (per-developer, never committed)
+*.local.md
