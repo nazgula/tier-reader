@@ -64,11 +64,14 @@ Checkbox vocab: `[ ]` pending · `[~]` in progress · `[x]` done.
 
 - [ ] `context-compiler` package: `route(tree, agent)` and `compile(nodes, budget, format)` over the engine.
 - [ ] Agent spec format: `{ id, domain, tagFilters?, entityFilters? }`.
+- [ ] **Lock `route()` mechanism before benchmarking:** tag/embedding match (deterministic, no orchestrator LLM call) vs LLM-routed (richer matching, costs one extra call per turn). Choice changes what the benchmark measures and what the post can claim. Default lean: tag/embedding match — the "no-orchestrator-LLM" story is a clean differentiator vs DACS.
 - [ ] Tier selection at compile time: walk subtree to budget-fitting depth.
 - [ ] `bullets` and `prose` output formats (prose = linearize titles into paragraphs).
-- [ ] Benchmark harness: 20 multi-domain user messages, agent counts N=3, 5, 10.
+- [ ] Benchmark harness: 20 multi-domain user messages, agent counts N=3, 5, 10. **Two baselines, not one:** (a) flat-broadcast (full message to every agent) and (b) DACS-style focus mode (full message to one focused agent + 200-token summaries to the rest, re-implemented as a small harness wrapper from arXiv:2604.07911). Beating only flat-broadcast is not a defensible claim in 2026 — DACS is the prior art reviewers will cite.
 - [ ] Measurements: tokens per agent (avg), total tokens across agents, steering accuracy via LLM-as-judge.
 - [ ] Resolve license + NPM scope; publish `@tier-reader/core` + `context-compiler` to NPM.
+
+**Framing for LinkedIn post #1 (Phase 4):** the contribution is **sub-turn-granularity** routing — DACS routes whole agents in/out of focus; tier-reader decomposes one user turn into a clause-tree and routes subtrees. Different unit, sharper benchmark.
 
 **Demoable:** `pnpm bench` produces `benchmarks/results.json` with token + accuracy comparison vs flat-broadcast baseline. Both packages installable from NPM.
 
