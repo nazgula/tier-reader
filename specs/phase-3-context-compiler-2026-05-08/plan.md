@@ -1,8 +1,8 @@
 # Phase 3 — Plan
 
-Status: 1 [~], 2 [ ], 3 [ ], 4 [ ], 5 [ ], 6 [ ]
+Status: 1 [x], 2 [ ], 3 [ ], 4 [ ], 5 [ ], 6 [ ]
 
-## 1. [~] Schema extension: tags + entities on nodes
+## 1. [x] Schema extension: tags + entities on nodes
 
 - Add optional `tags?: string[]` and `entities?: string[]` to `Node` in `packages/core/src/schema.ts`. Document in `docs/schema.md`.
 - Update decompose prompt(s) in `packages/core/src/prompt.ts` (or wherever the v2.5 default lives) to emit tags/entities per node:
