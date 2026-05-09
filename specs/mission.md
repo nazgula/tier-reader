@@ -53,4 +53,5 @@ That's it. No engagement, install-count, or inbound-contact thresholds. **Done =
 ## Open questions
 
 - [phase 3] **License** — deferred until the first NPM publish gate (phase 3). Publishing to NPM without a `LICENSE` file is legally awkward (consumers can't safely use unlicensed code); decide MIT vs Apache 2.0 before publishing `core` and `context-compiler`. Default lean: MIT.
+- [phase 4] **Final framing for LinkedIn post #1** — "multi-agent context routing" vs "sub-turn context slicing for skills/subagents/specialists." The trend in 2026 has moved away from explicit agent orchestration (DACS, AutoGen) toward one-capable-agent-with-many-skills (Anthropic Skills, Claude Code subagents, OpenAI Agents SDK). The underlying context-slicing problem is identical; only the wrapper vocabulary changes. Settle final wording at Phase 4 post-drafting time. Implementation in Phase 3 is framing-neutral (`AgentSpec` is just a struct).
 - [post-v1] **Standalone AI-chat-display package** — pull in only if an external consumer use case appears.

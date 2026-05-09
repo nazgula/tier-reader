@@ -37,9 +37,14 @@ Status: 1 [ ], 2 [ ], 3 [ ], 4 [ ], 5 [ ], 6 [ ]
 
 ## 3. [ ] Benchmark harness + dataset + results
 
-- `packages/context-compiler/benchmarks/dataset.ts`: ≥20 messages, each with metadata `{ id, text, expectedAgents: string[] }`.
-  - Pull DACS paper, list its message archetypes, and ensure dataset covers each one we're claiming to route well.
-  - Handcraft remaining messages with explicit multi-topic structure (clause A → agent X, clause B → agent Y).
+- `packages/context-compiler/benchmarks/dataset.ts`: ≥20 messages, each with metadata `{ id, text, source, domain, expectedAgents: string[] }`.
+  - **Domain mix (deliberate, not coding-only):** dev/coding, organizational comms (memos, multi-stakeholder letters, briefs), customer-support tickets that span specialist queues, research-assistant requests with multi-step subtasks. Stronger defensibility than yet-another-coding-benchmark.
+  - **Source mix:**
+    - ~6–8 from public chat dumps (ShareGPT, LMSYS-Chat-1M, WildChat). Real users, real noise. Cite source per entry.
+    - ~6–8 anonymized from the project author's own chat history (real branching multi-topic asks).
+    - ~6–8 AI-generated for specific edge-case coverage we can't find in the wild.
+  - **DACS coverage check:** read DACS paper examples, ensure each archetype they exercise is represented in our dataset (gap-fill, not source).
+  - All synthetic / AI-generated entries flagged in `findings.md`.
 - `benchmarks/agents.ts`: agent rosters for N=3, 5, 10 (id, description, system prompt, optional tag/entity filters). System prompt is what gets sent when the agent is actually invoked end-to-end.
 - `benchmarks/dataset.ts` per-message field: `expectedTasks: { agentId: string; expectedTask: string }[]` — feeds the output-quality judge.
 - `benchmarks/run.ts`: orchestrator. For each (message, N) cell, build per-agent context under each condition:
