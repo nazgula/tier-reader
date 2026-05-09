@@ -71,7 +71,8 @@ function toVector(text: string): number[] {
   const v = new Array<number>(dim).fill(0);
   const tokens = text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
   for (const tok of tokens) {
-    v[hashStr(tok) % dim] += 1;
+    const idx = hashStr(tok) % dim;
+    v[idx] = (v[idx] ?? 0) + 1;
   }
   return v;
 }

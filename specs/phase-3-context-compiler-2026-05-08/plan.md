@@ -1,6 +1,6 @@
 # Phase 3 — Plan
 
-Status: 1 [x], 2 [x], 3 [ ], 4 [ ], 5 [ ], 6 [ ]
+Status: 1 [x], 2 [x], 3 [~], 4 [ ], 5 [ ], 6 [ ]
 
 ## 1. [x] Schema extension: tags + entities on nodes
 
@@ -35,7 +35,7 @@ Status: 1 [x], 2 [x], 3 [ ], 4 [ ], 5 [ ], 6 [ ]
 
 **Demoable for sub-stage:** `pnpm --filter context-compiler test` green.
 
-## 3. [ ] Benchmark harness + dataset + results
+## 3. [~] Benchmark harness + dataset + results
 
 - `packages/context-compiler/benchmarks/dataset.ts`: ≥20 messages, each with metadata `{ id, text, source, domain, expectedAgents: string[] }`.
   - **Domain mix (deliberate, not coding-only):** dev/coding, organizational comms (memos, multi-stakeholder letters, briefs), customer-support tickets that span specialist queues, research-assistant requests with multi-step subtasks. Stronger defensibility than yet-another-coding-benchmark.

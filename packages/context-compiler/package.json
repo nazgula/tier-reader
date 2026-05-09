@@ -17,13 +17,17 @@
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.test.json",
+    "bench": "tsx benchmarks/run.ts"
   },
   "dependencies": {
     "@tier-reader/core": "workspace:*"
   },
   "devDependencies": {
+    "@ai-sdk/anthropic": "^1.0.6",
     "@types/node": "^22.10.5",
+    "ai": "^4.0.27",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   }

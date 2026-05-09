@@ -9,3 +9,5 @@ export type {
 } from "./types.js";
 export { route } from "./route.js";
 export { compile } from "./compile.js";
+export { voyageEmbedder, type VoyageOpts } from "./embeddings/voyage.js";
+export { cachedEmbedder, type CacheOpts } from "./embeddings/cache.js";
