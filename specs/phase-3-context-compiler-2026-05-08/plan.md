@@ -1,6 +1,6 @@
 # Phase 3 — Plan
 
-Status: 1 [x], 2 [~], 3 [ ], 4 [ ], 5 [ ], 6 [ ]
+Status: 1 [x], 2 [x], 3 [ ], 4 [ ], 5 [ ], 6 [ ]
 
 ## 1. [x] Schema extension: tags + entities on nodes
 
@@ -17,7 +17,7 @@ Status: 1 [x], 2 [~], 3 [ ], 4 [ ], 5 [ ], 6 [ ]
 
 **Demoable for sub-stage:** existing decompose test fixtures pass; one new fixture asserts tags/entities populated.
 
-## 2. [~] `context-compiler` package: route + compile
+## 2. [x] `context-compiler` package: route + compile
 
 - Scaffold `packages/context-compiler/` (package.json, tsconfig, vitest config) with workspace wiring (`pnpm-workspace.yaml`, `turbo.json`).
 - Depend on `@tier-reader/core` and Vercel AI SDK (Voyage embedding adapter).
