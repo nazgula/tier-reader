@@ -1,6 +1,6 @@
 # Phase 3 — Plan
 
-Status: 1 [x], 2 [x], 3 [~] (3.1 [~], 3.2 [ ], 3.3 [ ], 3.4 [ ]), 4 [ ], 5 [ ], 6 [ ]
+Status: 1 [x], 2 [x], 3 [~] (3.1 [x], 3.2 [ ], 3.3 [ ], 3.4 [ ]), 4 [ ], 5 [ ], 6 [ ]
 
 ## 1. [x] Schema extension: tags + entities on nodes
 
@@ -41,7 +41,7 @@ Split mid-phase after Pass A/B (commits `88b004e` … `984594c`) revealed the or
 
 The original sub-bullets of group 3 (dataset spec, agent rosters, run.ts orchestrator, end-to-end agent runs, LLM-as-judge, embedding cache, `pnpm bench` script, findings writeup) are now distributed across 3.1–3.4 below — bullets that already shipped are not restated.
 
-## 3.1 [~] `route()` filter investigation + fix
+## 3.1 [x] `route()` filter investigation + fix
 
 - Instrument `route()` to log `(entry-id, agent-id, step-A-survivors, step-B-survivors)` on at least one entry per domain represented in the current dataset stub.
 - Decide on the fix and apply it: filter relaxation (lowercased substring match, or fall back to embedding-only when step-A returns empty) vs dataset tag-vocabulary alignment with agent filters. Filter-relaxation is the more honest fix — agent filters in the wild won't be perfectly aligned with model-emitted tags either. Document the call.
