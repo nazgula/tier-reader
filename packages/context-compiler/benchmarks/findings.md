@@ -112,7 +112,53 @@ Super-Cut, BringUp.
 
 ## Observed wins / losses
 
-_Pass B fills in._
+_Real bench run fills in. The smoke-only observations below are
+single-entry, single-roster, and not representative — kept here only as
+priors for the next investigation pass._
+
+### Smoke run (2026-05-10) — 1 entry × N=3 × 5 conditions × 3 agents
+
+Entry: `ai-fan-out-3-domains` (synthetic 3-domain checkout/refund/FAQ ask).
+
+| condition | backend-api | frontend-ui | customer-support |
+|---|---|---|---|
+| flat-broadcast | 3/4 | 3/3 | 3/2 |
+| dacs-focus | 3/4 | 3/3 | 3/2 |
+| tier-hybrid | **0/0** | **0/0** | **0/0** |
+| tier-filter-only | **0/0** | **0/0** | **0/0** |
+| tier-embed-only | 0/0 | 0/0 | **5/5** |
+
+Reading: every `tier-*` condition produces empty slices for almost every
+agent. Only `tier-embed-only` produces a non-empty slice (customer-support
+5/5), which it does precisely because it bypasses the tag/entity filter.
+
+### Open investigation — `route()` step-A filter likely over-killing
+
+**Hypothesis:** the decompose pass that runs over a synthetic entry emits
+tags/entities that don't lexically intersect the agent `tagFilters` /
+`entityFilters` defined in `agents.ts`. Step-A intersection then returns
+an empty subtree set for most agents, and step-B similarity rank never
+sees survivors to rerank. Result: tier-hybrid and tier-filter-only both
+collapse to empty, while tier-embed-only (no step-A) still works.
+
+**Why this is interesting (and not bad news):** earlier worry was that
+synthetic entries would be self-favoring — written in vocabulary the
+hybrid router likes. The smoke result is the *opposite* failure mode —
+synthetics are accidentally adversarial to the filter, which means real
+results probably *understate* tier-hybrid rather than overstate it.
+
+**Highest-leverage next pass:** before any larger bench run, instrument
+`route()` to log (entry-id, agent-id, step-A-survivors, step-B-survivors)
+on at least one entry per domain. Either fix the filter behavior
+(e.g., relax to lower-cased substring match, or fall back to
+embedding-only when step-A returns empty) or change the dataset's
+emitted tag vocabulary to overlap with agent filters by construction.
+Filter-relaxation is the more honest fix — agent filters in the wild
+won't be perfectly aligned with model-emitted tags either.
+
+**Do not** declare tier-hybrid weak from this smoke. Single entry,
+single roster, observed-failure-mode is in the filter, not in the routing
+idea. Real bench run with the fix applied is what to publish off.
 
 ## Threats to validity
 
