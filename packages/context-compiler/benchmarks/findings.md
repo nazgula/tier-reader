@@ -132,33 +132,48 @@ Reading: every `tier-*` condition produces empty slices for almost every
 agent. Only `tier-embed-only` produces a non-empty slice (customer-support
 5/5), which it does precisely because it bypasses the tag/entity filter.
 
-### Open investigation — `route()` step-A filter likely over-killing
+### Closed investigation — `route()` step-A filter relaxation (3.1, 2026-05-10)
 
-**Hypothesis:** the decompose pass that runs over a synthetic entry emits
-tags/entities that don't lexically intersect the agent `tagFilters` /
-`entityFilters` defined in `agents.ts`. Step-A intersection then returns
-an empty subtree set for most agents, and step-B similarity rank never
-sees survivors to rerank. Result: tier-hybrid and tier-filter-only both
-collapse to empty, while tier-embed-only (no step-A) still works.
+**Hypothesis (confirmed mechanically):** the decompose pass over a
+synthetic entry emits free-form tags/entities that don't exact-match the
+agent `tagFilters` / `entityFilters` defined in `agents.ts`. Step-A's
+strict `Set` intersection then returned an empty subtree set for most
+agents, and step-B similarity rank never saw survivors to rerank. Result
+in the smoke: tier-hybrid and tier-filter-only both collapsed to empty,
+while tier-embed-only (no step-A) still worked. The failure shape
+matches strict-set-no-fallback exactly.
 
-**Why this is interesting (and not bad news):** earlier worry was that
-synthetic entries would be self-favoring — written in vocabulary the
-hybrid router likes. The smoke result is the *opposite* failure mode —
-synthetics are accidentally adversarial to the filter, which means real
-results probably *understate* tier-hybrid rather than overstate it.
+**Fix landed (3.1):**
 
-**Highest-leverage next pass:** before any larger bench run, instrument
-`route()` to log (entry-id, agent-id, step-A-survivors, step-B-survivors)
-on at least one entry per domain. Either fix the filter behavior
-(e.g., relax to lower-cased substring match, or fall back to
-embedding-only when step-A returns empty) or change the dataset's
-emitted tag vocabulary to overlap with agent filters by construction.
-Filter-relaxation is the more honest fix — agent filters in the wild
-won't be perfectly aligned with model-emitted tags either.
+1. **Lowercased substring match in `countOverlap`.** A node tag/entity
+   matches an agent filter if either is a substring of the other after
+   lowercasing. Justification: agent filters are short human-curated
+   labels (`"frontend"`, `"payments"`); model-emitted tags are free-form
+   (`"frontend-bug"`, `"Payments-Refund"`). Strict set-intersection is
+   too brittle for the actual vocabulary in play.
+2. **`fallbackOnEmpty: true` default on `RouteOpts`.** When step A
+   returns zero survivors, fall through to step B over all candidates
+   rather than returning empty. Real-world agent filters won't align
+   perfectly with model tags either; a silent empty result is a worse
+   failure than a similarity-only fallback.
+3. **`tier-filter-only` ablation pinned to `fallbackOnEmpty: false`** so
+   the ablation continues to mean strict set-intersection.
+4. **`opts.trace` callback on `route()`** + `--trace` flag on
+   `pnpm bench`. Library stays log-free; the harness emits
+   `[trace] entry N=cond agent cand=N stepA=N stepB=N (fallback?)`.
 
-**Do not** declare tier-hybrid weak from this smoke. Single entry,
-single roster, observed-failure-mode is in the filter, not in the routing
-idea. Real bench run with the fix applied is what to publish off.
+**Verification deferred to 3.4.** Unit tests cover the new branches
+(substring match in both directions, fallback engages when step A is
+empty, ablation preserves strict empty, trace event shape). One
+single-entry live re-smoke would not give meaningfully more confidence
+than the unit tests, and the real `pnpm bench` run in 3.4 is the
+better integration gate. The `--trace` flag means 3.4's first invocation
+will dump per-cell step-A/step-B counts and we'll see whether the fix
+behaves as intended across the floor-met dataset.
+
+**Do not** declare tier-hybrid strong or weak from the pre-fix smoke
+above. The pre-fix table stays in this document as historical record;
+it is *not* a published result.
 
 ## Threats to validity
 

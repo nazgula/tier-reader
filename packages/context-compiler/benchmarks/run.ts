@@ -75,6 +75,12 @@ export interface RunBenchOpts {
   log?: (msg: string) => void;
   /** Decompose impl override — tests pass a stub to avoid live LLM calls. */
   decomposeFn?: (text: string) => Promise<Awaited<ReturnType<typeof decompose>>>;
+  /**
+   * When true, log per-(entry, roster, condition, agent) Step A / Step B
+   * survivor counts to stderr. Used to diagnose `route()` filter behavior
+   * during the smoke-without-blind-faith pass.
+   */
+  trace?: boolean;
 }
 
 export async function runBench(opts: RunBenchOpts): Promise<BenchOutput> {
@@ -113,6 +119,18 @@ export async function runBench(opts: RunBenchOpts): Promise<BenchOutput> {
           if (!tree) tree = await decomposeFn(entry.text);
           if (dacsSummary === null) dacsSummary = await summarize(opts.agentRunner, entry.text);
 
+          const traceFn = opts.trace
+            ? (ev: import("../src/index.js").RouteTraceEvent) => {
+                process.stderr.write(
+                  `[trace] ${entry.id} N=${N} ${cond} ${ev.agentId} ` +
+                    `cand=${ev.candidateIds.length} stepA=${ev.stepASurvivorIds.length} ` +
+                    `stepB=${ev.stepBSurvivorIds.length}` +
+                    (ev.fallbackEngaged ? " (fallback)" : "") +
+                    "\n",
+                );
+              }
+            : undefined;
+
           const slices = await buildSlices(cond, {
             sourceMessage: entry.text,
             tree,
@@ -120,6 +138,7 @@ export async function runBench(opts: RunBenchOpts): Promise<BenchOutput> {
             embedder,
             budget,
             dacsSummary,
+            trace: traceFn,
           });
 
           for (const agent of remainingAgents) {
@@ -309,6 +328,7 @@ if (isMain) {
   const argv = process.argv.slice(2);
   const smoke = argv.includes("--smoke");
   const resume = argv.includes("--resume");
+  const trace = argv.includes("--trace");
 
   const baseRunner = anthropicRunner({ defaultModel: BENCH_MODELS.agent });
   const guarded = budgetedRunner(baseRunner, {
@@ -329,6 +349,7 @@ if (isMain) {
     agentRunner: guarded,
     judgeRunner: guarded,
     resume,
+    trace,
     ...subset,
   }).catch((err) => {
     process.stderr.write(`bench failed: ${err instanceof Error ? err.stack : String(err)}\n`);

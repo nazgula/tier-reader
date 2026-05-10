@@ -4,9 +4,21 @@ import type { AgentSpec, RouteOpts, RouteResultEntry } from "./types.js";
 const DEFAULT_THRESHOLD = 0.3;
 
 /**
- * Hybrid route: Step A is a tag/entity intersection filter; Step B is a
+ * Hybrid route: Step A is a tag/entity overlap filter; Step B is a
  * cosine-similarity rank between the agent's description and each surviving
  * subtree's title. Returns the matching subtree-root nodes.
+ *
+ * Step A vocabulary policy: lowercased substring match in either direction
+ * (filter ⊆ tag or tag ⊆ filter). Strict set-intersection is too brittle for
+ * model-emitted free-form tags vs. human-curated agent filters — e.g. an
+ * agent filter `"frontend"` will not exact-match an emitted tag like
+ * `"frontend-bug"`. Strict semantics are still reachable via
+ * `fallbackOnEmpty: false` for the benchmark ablation.
+ *
+ * `fallbackOnEmpty` (default true): when Step A returns zero survivors, fall
+ * through to Step B over all candidates rather than returning empty. Real
+ * agent filters won't be perfectly aligned with model tags either, and a
+ * silent empty result is a worse failure than a similarity-only fallback.
  *
  * Determinism: given a fixed embedder + threshold, the output is fully
  * determined by the input tree and agent spec.
@@ -22,9 +34,10 @@ export async function route(
 
   const threshold = opts.threshold ?? DEFAULT_THRESHOLD;
   const maxDepth = opts.maxDepth ?? 0;
+  const fallbackOnEmpty = opts.fallbackOnEmpty ?? true;
   const candidates = collectCandidates(tree, maxDepth);
 
-  // Step A — hard filter by tag/entity intersection over the whole subtree.
+  // Step A — overlap filter (lowercased substring) over the whole subtree.
   const stepA: { node: Node; filterMatches: number }[] = [];
   const filterEmpty = !agent.tagFilters?.length && !agent.entityFilters?.length;
   for (const node of candidates) {
@@ -36,23 +49,47 @@ export async function route(
     if (overlap > 0) stepA.push({ node, filterMatches: overlap });
   }
 
-  if (opts.filterOnly || stepA.length === 0) {
-    return stepA.map(({ node, filterMatches }) => ({
+  // Decide Step B input: Step A survivors, optionally falling back to all
+  // candidates when Step A is empty and fallback is enabled. Filter-only
+  // skips Step B entirely and returns Step A as-is (no fallback).
+  let stepBInput = stepA;
+  let fallbackEngaged = false;
+  if (
+    !opts.filterOnly &&
+    !opts.embeddingOnly &&
+    !filterEmpty &&
+    stepA.length === 0 &&
+    fallbackOnEmpty
+  ) {
+    stepBInput = candidates.map((node) => ({ node, filterMatches: 0 }));
+    fallbackEngaged = true;
+  }
+
+  if (opts.filterOnly || stepBInput.length === 0) {
+    const out = stepA.map(({ node, filterMatches }) => ({
       node,
       similarity: null,
       filterMatches,
     }));
+    opts.trace?.({
+      agentId: agent.id,
+      candidateIds: candidates.map((n) => n.id),
+      stepASurvivorIds: stepA.map(({ node }) => node.id),
+      fallbackEngaged: false,
+      stepBSurvivorIds: out.map((e) => e.node.id),
+    });
+    return out;
   }
 
   // Step B — cosine similarity between agent description and subtree title.
-  const titles = stepA.map(({ node }) => node.title);
+  const titles = stepBInput.map(({ node }) => node.title);
   const vectors = await opts.embedder.embed([agent.description, ...titles]);
   const agentVec = vectors[0];
   if (!agentVec) throw new Error("route: embedder returned no vector for agent description");
 
   const out: RouteResultEntry[] = [];
-  for (let i = 0; i < stepA.length; i++) {
-    const entry = stepA[i];
+  for (let i = 0; i < stepBInput.length; i++) {
+    const entry = stepBInput[i];
     const titleVec = vectors[i + 1];
     if (!entry || !titleVec) continue;
     const sim = cosine(agentVec, titleVec);
@@ -63,6 +100,13 @@ export async function route(
 
   // Stable sort by descending similarity; ties preserve source order.
   out.sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0));
+  opts.trace?.({
+    agentId: agent.id,
+    candidateIds: candidates.map((n) => n.id),
+    stepASurvivorIds: stepA.map(({ node }) => node.id),
+    fallbackEngaged,
+    stepBSurvivorIds: out.map((e) => e.node.id),
+  });
   return out;
 }
 
@@ -114,15 +158,21 @@ function countOverlap(
   tagFilters: string[] | undefined,
   entityFilters: string[] | undefined,
 ): number {
-  const tagSet = new Set(tagFilters ?? []);
-  const entSet = new Set(entityFilters ?? []);
+  const tagFs = (tagFilters ?? []).map((f) => f.toLowerCase()).filter((f) => f.length > 0);
+  const entFs = (entityFilters ?? []).map((f) => f.toLowerCase()).filter((f) => f.length > 0);
   let matches = 0;
   walk(tree, rootId, (node) => {
-    if (tagSet.size && node.tags?.length) {
-      for (const t of node.tags) if (tagSet.has(t)) matches++;
+    if (tagFs.length && node.tags?.length) {
+      for (const t of node.tags) {
+        const tl = t.toLowerCase();
+        if (tagFs.some((f) => tl.includes(f) || f.includes(tl))) matches++;
+      }
     }
-    if (entSet.size && node.entities?.length) {
-      for (const e of node.entities) if (entSet.has(e)) matches++;
+    if (entFs.length && node.entities?.length) {
+      for (const e of node.entities) {
+        const el = e.toLowerCase();
+        if (entFs.some((f) => el.includes(f) || f.includes(el))) matches++;
+      }
     }
   });
   return matches;

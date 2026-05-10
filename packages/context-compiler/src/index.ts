@@ -3,6 +3,7 @@ export type {
   Embedder,
   RouteOpts,
   RouteResultEntry,
+  RouteTraceEvent,
   CompileFormat,
   CompileOpts,
   CompileResult,

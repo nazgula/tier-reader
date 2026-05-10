@@ -27,6 +27,24 @@ export interface RouteOpts {
   filterOnly?: boolean;
   /** When true, skip Step A (filter). Only similarity rank applies. */
   embeddingOnly?: boolean;
+  /**
+   * When Step A returns zero survivors, fall through to Step B over all
+   * candidates instead of returning empty. Default true. Set false to
+   * preserve strict set-intersection semantics (used by the
+   * `tier-filter-only` benchmark ablation).
+   */
+  fallbackOnEmpty?: boolean;
+  /** Optional instrumentation hook. Library stays log-free; callers wire it. */
+  trace?: (event: RouteTraceEvent) => void;
+}
+
+export interface RouteTraceEvent {
+  agentId: string;
+  candidateIds: NodeId[];
+  stepASurvivorIds: NodeId[];
+  /** Whether Step A was empty and fallback engaged (treats all candidates as survivors for Step B). */
+  fallbackEngaged: boolean;
+  stepBSurvivorIds: NodeId[];
 }
 
 export interface RouteResultEntry {

@@ -1,5 +1,5 @@
 import type { Tree } from "@tier-reader/core";
-import { type Embedder, compile, route } from "../src/index.js";
+import { type Embedder, type RouteTraceEvent, compile, route } from "../src/index.js";
 import type { BenchAgent } from "./agents.js";
 
 export type ConditionId =
@@ -21,6 +21,8 @@ export interface ConditionContext {
   budget: number;
   /** 200-token summary used by DACS focus-mode for non-focus agents. */
   dacsSummary: string;
+  /** Optional route-trace hook; forwarded to `route()` for `tier-*` conditions. */
+  trace?: (event: RouteTraceEvent) => void;
 }
 
 export interface AgentSlice {
@@ -52,7 +54,9 @@ export async function buildSlices(
       return runTier(ctx, {});
 
     case "tier-filter-only":
-      return runTier(ctx, { filterOnly: true });
+      // Strict set-intersection ablation — disable fallback so a filter miss
+      // genuinely returns empty rather than collapsing into embed-only.
+      return runTier(ctx, { filterOnly: true, fallbackOnEmpty: false });
 
     case "tier-embed-only":
       return runTier(ctx, { embeddingOnly: true });
@@ -66,7 +70,7 @@ export async function buildSlices(
 
 async function runTier(
   ctx: ConditionContext,
-  opts: { filterOnly?: boolean; embeddingOnly?: boolean },
+  opts: { filterOnly?: boolean; embeddingOnly?: boolean; fallbackOnEmpty?: boolean },
 ): Promise<AgentSlice[]> {
   const slices: AgentSlice[] = [];
   for (const agent of ctx.roster) {
@@ -74,6 +78,8 @@ async function runTier(
       embedder: ctx.embedder,
       filterOnly: opts.filterOnly,
       embeddingOnly: opts.embeddingOnly,
+      fallbackOnEmpty: opts.fallbackOnEmpty,
+      trace: ctx.trace,
     });
     if (matches.length === 0) {
       slices.push({ agentId: agent.id, text: "" });
