@@ -13,3 +13,7 @@ coverage/
 
 # Local-only notes (per-developer, never committed)
 *.local.md
+
+# Benchmark run outputs (regenerated each run)
+packages/context-compiler/benchmarks/results.json
+packages/context-compiler/benchmarks/.cache/

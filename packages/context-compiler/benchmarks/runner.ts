@@ -19,7 +19,7 @@ export interface LLMRunner {
 }
 
 const DEFAULT_AGENT_MODEL = "claude-haiku-4-5-20251001";
-const DEFAULT_JUDGE_MODEL = "claude-sonnet-4-6-20251022";
+const DEFAULT_JUDGE_MODEL = "claude-sonnet-4-6";
 
 export interface AnthropicRunnerOpts {
   apiKey?: string;
