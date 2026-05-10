@@ -254,6 +254,70 @@ export const AI_GENERATED_ENTRIES: DatasetEntry[] = [
       },
     ],
   },
+  {
+    ...AI,
+    id: "ai-research-survey-multi-domain",
+    domain: "research",
+    text: [
+      "I'm putting together an internal briefing on the state of multi-agent LLM coordination as of mid-2026. I need three things, and I'd like them organized:",
+      "",
+      "1. A literature survey of the major routing/orchestration frameworks (DACS, Anthropic Skills, AutoGen, MetaGPT, CrewAI, and any I'm missing) — what each does, how they differ from each other, and where they overlap. Cite the original paper or canonical doc per system.",
+      "",
+      "2. A comparative analysis: token cost per turn, routing accuracy from published benchmarks where available, and which scenarios each framework handles well versus badly.",
+      "",
+      "3. A recommendation — given a team that already has Claude Skills plus a small Python orchestrator in production, which of these frameworks (if any) is worth migrating to, and which should we explicitly avoid?",
+    ].join("\n"),
+    expectedAgents: ["research-writing", "data-analytics", "product-pm"],
+    expectedTasks: [
+      {
+        agentId: "research-writing",
+        expectedTask:
+          "Produce the literature survey of multi-agent LLM coordination frameworks with one paragraph per system and a citation to the canonical paper or doc.",
+      },
+      {
+        agentId: "data-analytics",
+        expectedTask:
+          "Build the comparative analysis (token cost per turn, published routing-accuracy numbers, scenario fit) into a structured table grounded in cited benchmark data.",
+      },
+      {
+        agentId: "product-pm",
+        expectedTask:
+          "Make the migration recommendation given the team's existing Claude Skills + Python orchestrator stack: name a specific framework to adopt or skip, with rationale.",
+      },
+    ],
+  },
+  {
+    ...AI,
+    id: "ai-data-pipeline-multi-stakeholder",
+    domain: "dev",
+    text: [
+      "We're moving the genomics-results ingestion pipeline off the legacy Hadoop cluster onto a managed setup. Three things are coupled and I need each owner to weigh in before we lock the design:",
+      "",
+      "The data side: source files are VCF + BAM in S3 (~40GB/day), output needs to land in BigQuery with a schema that matches the existing analytics dashboards. We can either parse on ingest or store raw + parse on query — pick one and explain why.",
+      "",
+      "The reliability side: the pipeline must be idempotent on re-runs (same VCF processed twice produces the same row count, no duplicates). Also need a dead-letter queue for malformed VCF headers — the current system silently drops them and we've been masking quality issues for months.",
+      "",
+      "The compliance side: VCF files contain de-identified patient data but the audit logger needs to record every read access at the file level. The current Hadoop setup logs at the directory level, which is failing our HIPAA review.",
+    ].join("\n"),
+    expectedAgents: ["data-analytics", "ops-oncall", "compliance-kyc"],
+    expectedTasks: [
+      {
+        agentId: "data-analytics",
+        expectedTask:
+          "Decide parse-on-ingest vs. raw+parse-on-query for the VCF→BigQuery flow, with schema and performance rationale tied to the existing dashboard contract.",
+      },
+      {
+        agentId: "ops-oncall",
+        expectedTask:
+          "Specify the idempotency contract and dead-letter queue handling so re-runs do not duplicate rows and malformed headers stop being silently dropped.",
+      },
+      {
+        agentId: "compliance-kyc",
+        expectedTask:
+          "Specify file-level read-access audit logging that satisfies the HIPAA review the directory-level Hadoop logging is failing.",
+      },
+    ],
+  },
 ];
 
 /**
@@ -295,6 +359,43 @@ export const AUTHOR_HISTORY_ENTRIES: DatasetEntry[] = [
         agentId: "research-writing",
         expectedTask:
           "Indicate market-saturation status for each avenue (has this been done a lot or not), citing what's known vs. requires deeper research.",
+      },
+    ],
+  },
+  {
+    id: "author-ai-automation-smb-research",
+    source: "author-chat-history (2026-04-29, AI automation for Israeli SMBs — turn 0)",
+    synthetic: false,
+    domain: "research",
+    // Verbatim from author chat. Personal-financial framing redacted to neutral
+    // task framing per findings.md anonymization rules; routing signal (SMB-
+    // targeting, AI tools, Israel 2026 market) preserved unchanged.
+    text: [
+      "I'm trying to find ways to generate income on my own.",
+      "",
+      "What can I do, using basic AI tools or automations, to generate easy-to-implement solutions for independent small-to-medium businesses in Israel 2026? Do good research and think hard.",
+    ].join("\n"),
+    expectedAgents: ["research-writing", "product-pm", "data-analytics", "backend-api"],
+    expectedTasks: [
+      {
+        agentId: "research-writing",
+        expectedTask:
+          "Survey the Israel-2026 SMB market landscape: which forcing functions (regulatory, communication-channel saturation, language model maturity) make AI automations a real opening right now, with sources.",
+      },
+      {
+        agentId: "product-pm",
+        expectedTask:
+          "Propose 2–3 productizable offer shapes (vertical, scope, packaging) ranked by speed-to-first-paying-client, each with a target customer and a one-line value claim.",
+      },
+      {
+        agentId: "data-analytics",
+        expectedTask:
+          "Provide concrete pricing data for the existing Israeli SMB AI-automation market (setup cost, monthly retainer, typical ROI window) and tier the offerings by complexity.",
+      },
+      {
+        agentId: "backend-api",
+        expectedTask:
+          "Sketch the technical shape of a representative offer (e.g., WhatsApp-front-desk bot): API surfaces, integrations (WhatsApp Cloud API, calendar, payment), and what 'easy to implement' actually buys at the architecture level.",
       },
     ],
   },
@@ -453,6 +554,149 @@ export const MULTI_TURN_ENTRIES: MultiTurnEntry[] = [
             agentId: "product-pm",
             expectedTask:
               "Frame the role as a co-founder at pre-seed without overclaiming shipped deliverables.",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "author-bringup-property-management-arc",
+    source: "author-chat-history (2026-03-22, BringUp property-management software evaluation)",
+    synthetic: false,
+    domain: "org-comms",
+    // Verbatim Hebrew from author chat. Hebrew is preserved deliberately —
+    // see findings.md "Multilingual judge note" — Sonnet 4.6 evaluates Hebrew
+    // input directly. Public products (Monday.com, Make, Fillout) and the
+    // commercial price (40,950 NIS) are not PII; BringUp retained per the
+    // anonymization mapping. No third-party personal names appear.
+    turns: [
+      {
+        turnIndex: 0,
+        text: [
+          "תעבור על ההצעה הזאת עד עמוד חמש (משש והלאה אין צורך)",
+          "מדובר במערכת שהיא כלי עבודה לחברת ניהול בניין משרדים, שמשרתת בעיקר את אב הבית, וגם את הדירים והשומרים (לא בטוחה אם הם ממש משתמשים במערכת או רק מדווחים)",
+          "",
+          "אני עומדת להכנס לפגישה עם החברה, אני מגיעה כיעצת לבעלים שמתעניין בשות ורוצה לבדוק האם זה מתאים לו ולבניין.",
+          "בפגישה אני אראה דמו של המוצר.",
+          "אני רוצה להגיע מוכנה עם שאלות,",
+          "ובקשות (נניח חסר לי מאד אפיון כלשהו,)",
+          "",
+          "אני צריכה את עזרתך להתכון לפגישה",
+        ].join("\n"),
+      },
+      {
+        turnIndex: 1,
+        text: [
+          "כן. ובבקשה תעשה חשיבה עמוקה לפני. ותכתוב את התשובות בצורה מתומצת ובפורמט צפוך (בולטים)",
+          "עוד נקודות שחשבתי עליהם",
+          "",
+          "מי המשתמשים ? צריך איזה חשבון מנדיי",
+          "איך דייר עוקב אחרי תקלה?",
+          "איך מוודאים ששום פנייה לא הולכת לאיבוד? Retray / log הודעה ליוזר שנכשל?",
+          "מה זה ברקוד לשומרים??",
+          "מה קורה כשאותה תקלה נשלחת פעמים רבות עי דיירים רבים?",
+          "מה קורה כשיש 100 תקלות?",
+          "האם יש לבניין SLA? איך אב הבית מתעדף?",
+          "נניח שוייך ספק. ולא הגיע, ואני רוצה לשיך ספק אחר. מה התהליך? אני כותבת משהו על הספק הנוכחי",
+          "מה קורה אם האוטומציה נופלת?",
+          "בדיקות. סביבת בדיקות. תסריטי בדיקה (מספר פניות שנפתחו כמספר הפניות שנשלחו. נסגרו כנל) אולי פיילוט משתמשים. כמות מוגבלת, מודל אחד בלבד (תקלות)",
+          "מה בדחות, מה רואה כל משתמש במערכת? או שזה רק אב הבית? מה רואה הבעלים של החברה? יש לו יוזר?",
+        ].join("\n"),
+      },
+      {
+        turnIndex: 2,
+        text: "מה דעתך כרגע על עות המערכת (תחקור ברשת להעריך)",
+      },
+      {
+        turnIndex: 3,
+        text: [
+          "הייתי בפגישה:",
+          "",
+          "אוקי - הייתי בפגישה אז ככה. יש משימות קבועות של הבניין - שחוזרות על עצמן, והן מוזנות קודם כל והם חלק מהלייף סייקל (בדיקות שנאים, גינון וכך הלאה) יש פניות שמגיעות מדיירים - דרך מייל - ובמערכת המנדיי יצורף כפתור שמעביר את זה להיות שורת משימה. אין שם בינה מלאכותית שמבינה ומעדכנת - אני מניחה שזה פשוט הנושא של המייל וגוף המייל, וקבצים מצורפים. כרגע אין איחוד פניות. אם יהיהו הרבה פניות זה יהיה מאתגר - על SLA לא דיברנו ספקים מחוברים למשימות. כרגע פשוט מזינים לתוך המערכת ספקים + הסכם השרות איתם (אפשר רק לראות אותו, לא קורה שום דבר אמיתי - אם אפשר להכניס sla) כן יש דוח סיום עבודה שהם עושים - שזה דוח שנשלח להם בווטסאף שהם ממלאים וזה הופך לשורה.",
+          "",
+          "על השומרים לא דברנו הרבה - יש להם מעין qr קודז שהם סורקים כשהם עוברים בנקודות מסויימות. זו כבר מערכת קיימת",
+        ].join("\n"),
+      },
+      {
+        turnIndex: 4,
+        text: "כפי שכרגע המערכת מתוארת - כמה היא שווה את המחיר?",
+      },
+    ],
+    evaluations: [
+      {
+        atTurn: 0,
+        requiredPriorContext: [],
+        expectedAgents: [
+          "product-pm",
+          "payments",
+          "security",
+          "backend-api",
+          "data-analytics",
+          "ops-oncall",
+          "research-writing",
+        ],
+        expectedTasks: [
+          {
+            agentId: "product-pm",
+            expectedTask:
+              "Frame the consultant's prep ask: what to evaluate at the demo (module scope, fit-for-purpose for a single office building), and how to position the value-vs-price question for the owner.",
+          },
+          {
+            agentId: "payments",
+            expectedTask:
+              "Flag that the proposal hides the recurring license cost (Monday + Make + Fillout) on top of the one-time NIS price, and prepare a TCO question set for the meeting.",
+          },
+          {
+            agentId: "security",
+            expectedTask:
+              "Surface the multi-user-access and visibility questions for the meeting: who sees what (owner, building manager, residents, guards), and what the guards-module's actual security boundary is.",
+          },
+          {
+            agentId: "backend-api",
+            expectedTask:
+              "Identify the integration unknowns to ask about at the demo: how email→task conversion actually works (parsing, dedup, attachments), Make automation reliability (retry, dead-letter), and Fillout form-to-row flow.",
+          },
+          {
+            agentId: "data-analytics",
+            expectedTask:
+              "Prepare the dashboard / KPI questions: what reporting the system gives the owner (resolution time, open issues, guard-route compliance) and whether export to Excel/PDF is supported.",
+          },
+          {
+            agentId: "ops-oncall",
+            expectedTask:
+              "Flag the SLA/escalation gap to ask about: how the system handles 100+ open issues, prioritization, automation-failure detection, and reconciliation that no email is silently dropped.",
+          },
+          {
+            agentId: "research-writing",
+            expectedTask:
+              "Produce a clean, printable Hebrew question list organized by topic (users/licenses, resident UX, reliability, supplier flow, guards, dashboards, testing/pilot, strategic).",
+          },
+        ],
+      },
+      {
+        atTurn: 4,
+        requiredPriorContext: [
+          "The proposal covers three modules — task management (62h), resident requests (25h), guards (35h) — totaling ~120h at 40,950 NIS after discount on a Monday.com + Make + Fillout stack.",
+          "Pre-meeting concerns raised in turn 1: no email-deduplication, no SLA, supplier records are view-only, guards-module unknown integration.",
+          "Cost research from turn 2 surfaced the recurring license cost: Monday Pro for ~5 seats + Make + Fillout adds ~9–10K NIS/year on top of the one-time fee.",
+          "Post-meeting facts from turn 3: email→task is a manual button (no AI parsing or dedup), no SLA was discussed, supplier agreements are view-only without action, an external QR-based guard system already exists.",
+        ],
+        expectedAgents: ["payments", "product-pm", "security"],
+        expectedTasks: [
+          {
+            agentId: "payments",
+            expectedTask:
+              "Compute a value-versus-price verdict per module in NIS, integrating the post-meeting reality (manual email→task, no AI dedup, view-only supplier agreements, redundant guards module given existing QR system) and the recurring license cost surfaced in turn 2.",
+          },
+          {
+            agentId: "product-pm",
+            expectedTask:
+              "Recommend proceed / negotiate / pause to the owner. Specifically: name which modules to keep, drop, or rescope, and target a revised price range that reflects the value gap.",
+          },
+          {
+            agentId: "security",
+            expectedTask:
+              "Decide whether the guards module is worth its 11,200 NIS line item given the existing QR system flagged in turn 3, and articulate the reason crisply.",
           },
         ],
       },

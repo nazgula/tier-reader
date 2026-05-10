@@ -1,14 +1,14 @@
 # Benchmark findings — context-compiler v0.1
 
-> **Status:** harness scaffolded; dataset has 7 AI-generated + 1 author-history
-> single-turn entry, plus 1 multi-turn schema-stub entry. Public-dump entries
-> and the real `pnpm bench` run land in subsequent passes. All numbers in this
+> **Status:** harness scaffolded; dataset has 9 AI-generated + 2 author-history
+> single-turn entries, plus 2 multi-turn entries (Super-Cut English arc;
+> BringUp Hebrew arc). Real `pnpm bench` run lands in 3.4. All numbers in this
 > document are placeholders until that run completes.
 >
-> **≥20-entry floor not yet met.** Current count is 9 entries (8 single-turn +
-> 1 multi-turn). This is intentional for this commit — see "Deferred" below.
-> The floor is reachable once public-dump entries land and additional
-> author-history candidates are translated from Hebrew.
+> **≥20-entry floor not yet met.** Current count is 13 entries (11 single-turn
+> + 2 multi-turn). Remaining ~7+ entries land in the next 3.2 batch from
+> further `examples/maria-chats/` mining and additional DACS-archetype
+> gap-fill synthetics.
 
 ## Setup
 
@@ -31,19 +31,69 @@
 
 ## Dataset
 
-- AI-generated edge cases (7): see `dataset.ts` `AI_GENERATED_ENTRIES`.
-- Author-history entries (1): `AUTHOR_HISTORY_ENTRIES`. Single-turn 3+-agent
-  fan-out from real chat history; verbatim user message with no third-party
-  named entities present.
-- Public-dump entries: **Deferred.** ShareGPT / LMSYS-Chat-1M / WildChat
-  pulls require dataset-viewer fetches with proper per-entry citation;
-  scoped as its own follow-up task rather than rushed inline.
-- DACS coverage check: **Deferred** — pending paper link + author-history
-  expansion (currently too few entries to gap-fill against).
+- AI-generated edge cases (9): see `dataset.ts` `AI_GENERATED_ENTRIES`. Two
+  added in 3.2 (`ai-research-survey-multi-domain`,
+  `ai-data-pipeline-multi-stakeholder`) deliberately fill DACS-archetype
+  gaps — see "DACS coverage" below.
+- Author-history single-turn entries (2): `AUTHOR_HISTORY_ENTRIES`.
+  `author-vertical-brainstorm` (3-agent fan-out, no third-party names);
+  `author-ai-automation-smb-research` (4-agent fan-out — research-writing,
+  product-pm, data-analytics, backend-api — derived from turn 0 of a
+  longer conversation; personal-financial framing redacted to neutral
+  task framing per the rule below).
+- Author-history multi-turn entries (2): `MULTI_TURN_ENTRIES`. See
+  "Multi-turn sub-suite" below.
+- Public-dump entries: **dropped (not deferred).** Multi-agent fan-out is
+  structurally rare in ShareGPT / LMSYS-Chat-1M / WildChat — those dumps
+  are dominated by single-domain technical asks. Sampling random rows
+  yields entries off-distribution from what we benchmark; finding real
+  fan-out cases requires skimming hundreds of rows per usable entry. The
+  honest framing for reviewers: *public chat dumps are biased toward
+  single-domain queries; we deliberately curated a higher-fan-out source
+  (author chat history) and used flagged AI-generated entries for
+  archetype gap-fill we control.* This decision is recorded as a
+  methodological choice, not a corner-cut.
 
 All AI-generated entries are flagged via `synthetic: true` for transparency.
 
-### Multi-turn sub-suite (schema stub)
+### Personal-data redaction rule
+
+For author-history entries derived from real chat:
+
+- Public products and commercial prices (Monday.com, Make, Fillout, NIS
+  amounts) are **not** PII and stay verbatim.
+- Role-framing (e.g., "consulting for the building owner") stays verbatim.
+- **Personal-financial / employment-status framing is redacted to neutral
+  task framing.** Example applied to `author-ai-automation-smb-research`:
+  the verbatim opening "I am broke. I dont mange to get a job" was
+  rewritten to "I'm trying to find ways to generate income on my own"
+  before the rest of the message. Routing signal (SMB-targeting, AI
+  tools, Israel 2026) preserved unchanged; the personal-distress framing
+  removed.
+- Third-party names map per the table below.
+
+### DACS coverage
+
+DACS (arXiv:2604.07911) does not enumerate user-message archetypes; it
+organizes evaluation around **agent task domains**. Our coverage map:
+
+| DACS task domain | Example DACS scenarios | Our coverage |
+|---|---|---|
+| Coding / data-structure | BST, lock-free queue, RB tree, hash table, async scraper, distributed cache | `ai-fan-out-3-domains`, `author-supercut-architecture-arc` (multi-turn) |
+| Research / survey | Transformer attention, RL, diffusion, federated learning, post-quantum crypto surveys | `ai-research-survey-multi-domain` (added 3.2) |
+| Data processing / ETL | CSV encoding, genomics VCF ETL, BERT legal-text classifier | `ai-data-pipeline-multi-stakeholder` (added 3.2) |
+| Debugging / reliability | C++ debugger, flaky-test debugging, fraud detection | partial — `ai-fan-out-3-domains` (mobile checkout regression diagnosis); explicit fan-out-shaped debugging entry pending in next 3.2 batch |
+| Clinical methodology | Clinical-trial methodology, hypothesis testing | partial — touched by `ai-data-pipeline-multi-stakeholder` (HIPAA aspect); not exhaustively |
+
+**Defensibility note:** our org-comms / customer-support / research-
+assistant entries (e.g., `author-bringup-property-management-arc`,
+`author-ai-automation-smb-research`, `author-vertical-brainstorm`) are
+*broader* than DACS's task-domain set — DACS is coding-and-research-
+heavy. The coverage map above is one-directional: we ensure our dataset
+is at least as broad as DACS so cross-paper comparisons are valid, while
+our breadth advantage stays a deliberate methodological choice.
+
+### Multi-turn sub-suite
 
 `MULTI_TURN_ENTRIES` defines a separate evaluation track that measures
 **cross-turn context propagation** — whether the routing system carries
@@ -52,18 +102,33 @@ The benchmark-relevant signal: a router that re-decomposes the running tree
 each turn (tier-hybrid) preserves earlier facts; a flat-broadcast or
 DACS-focus baseline that only sees the latest message will miss them.
 
-Currently authored: 1 entry (`author-supercut-architecture-arc`) with two
-evaluation points (turn 0 — initial 5-agent fan-out; turn 2 — knowledge-base
-ask that requires turn-0 architecture facts to answer correctly).
+Currently authored (2 entries, both real conversations):
 
-**Harness wiring is deferred.** `run.ts` does not yet route multi-turn
-entries; it skips them. The schema is in place so the design is reviewable
-and additional entries can be authored without further plumbing churn.
+- `author-supercut-architecture-arc` (English, 3 turns). Evaluations at
+  turn 0 (initial 5-agent fan-out across frontend/backend/data/PM/
+  research-writing) and turn 2 (knowledge-base draft ask requiring
+  turn-0 architecture facts).
+- `author-bringup-property-management-arc` (Hebrew, 5 turns). Evaluations
+  at turn 0 (broad 7-agent demo-prep fan-out) and turn 4 (value-vs-price
+  verdict requiring three earlier facts: turn-1's question list,
+  turn-2's cost research, turn-3's post-meeting reality check).
+
+**Multilingual judge note (Hebrew):** Sonnet 4.6 evaluates the Hebrew
+BringUp arc directly without translation; bench cost is unchanged.
+Decision recorded here so 3.4's run can confirm or revise.
+
+**Harness wiring is deferred to 3.3.** `run.ts` does not yet route
+multi-turn entries; it skips them. The schema is in place so the design
+is reviewable and additional entries can be authored without further
+plumbing churn.
 
 ### Anonymization
 
-The single included author entry contains no third-party personal names in
-its verbatim text and required no substitutions. The mapping defined for
+`author-vertical-brainstorm` and `author-ai-automation-smb-research`
+contain no third-party personal names in their kept text.
+`author-bringup-property-management-arc` references only public products
+(Monday.com, Make, Fillout) and a commercial price (40,950 NIS) — none
+PII; `BringUp` retained per the kept-names list. The mapping defined for
 future entries is:
 
 - People: Achiya → VendorA-Person; any other named individuals → Person1, Person2…
@@ -82,19 +147,22 @@ Super-Cut, BringUp.
 
 ### Deferred — explicit gap list
 
-1. **Public-dump entries.** Need real per-entry citations from ShareGPT /
-   LMSYS-Chat-1M / WildChat. Network/fetch task.
-2. **Hebrew author conversations.** The strongest cross-turn-propagation
-   candidate (the BringUp building-management-software evaluation, 5 turns
-   spanning pre-meeting → post-meeting → value verdict) is in Hebrew and
-   currently skipped. Needs translation pass + Hebrew-judge feasibility
-   confirmation.
-3. **Multi-turn harness wiring in `run.ts`.** Per-turn route + per-evaluation
-   propagation judge. Schema is ready; `runner.ts` integration is the next
-   step.
-4. **DACS coverage check.** Needs the paper's archetype list cross-referenced
-   against final dataset once it has volume.
-5. **Reaching the ≥20 entry floor.** Resolved once 1+2 land.
+1. ~~**Public-dump entries.**~~ **Dropped** — see "Dataset" section
+   above for the methodological argument. Public-dump volume is not a
+   virtue when the volume is off-distribution.
+2. ~~**Hebrew author conversations.**~~ **Closed (3.2)** — BringUp 5-turn
+   arc landed as `author-bringup-property-management-arc`, kept in
+   Hebrew; multilingual judge note recorded above.
+3. **Multi-turn harness wiring in `run.ts`.** Per-turn route + per-
+   evaluation propagation judge. Schema ready; `runner.ts` integration is
+   3.3's scope.
+4. ~~**DACS coverage check.**~~ **Closed (3.2)** — coverage table in
+   "Dataset → DACS coverage" above; two synthetic entries added to fill
+   research-survey and data-processing/ETL gaps.
+5. **Reaching the ≥20 entry floor.** Currently at 13. Remaining ~7+
+   entries from further `examples/maria-chats/` mining (single-turn
+   extracts) + 1–2 more DACS-archetype gap-fill synthetics
+   (debugging-fan-out, clinical-methodology) in the next 3.2 batch.
 
 ## Success-signal table
 

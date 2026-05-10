@@ -1,6 +1,6 @@
 # Phase 3 — Plan
 
-Status: 1 [x], 2 [x], 3 [~] (3.1 [x], 3.2 [ ], 3.3 [ ], 3.4 [ ]), 4 [ ], 5 [ ], 6 [ ]
+Status: 1 [x], 2 [x], 3 [~] (3.1 [x], 3.2 [~], 3.3 [ ], 3.4 [ ]), 4 [ ], 5 [ ], 6 [ ]
 
 ## 1. [x] Schema extension: tags + entities on nodes
 
@@ -50,7 +50,7 @@ The original sub-bullets of group 3 (dataset spec, agent rosters, run.ts orchest
 
 **Demoable for sub-stage:** smoke re-run shows non-empty `tier-hybrid` slices; `findings.md` open-investigation section is resolved.
 
-## 3.2 [ ] Dataset to floor + DACS coverage
+## 3.2 [~] Dataset to floor + DACS coverage
 
 - Public-dump entries: ~6–8 from ShareGPT / LMSYS-Chat-1M / WildChat with proper per-entry citations. Flag `synthetic: false`.
 - Hebrew author-history: translate the BringUp 5-turn arc + 1–2 other strong candidates from the `examples/maria-chats/` working set. Confirm Hebrew-judge feasibility or commit to English-translated-only entries.
