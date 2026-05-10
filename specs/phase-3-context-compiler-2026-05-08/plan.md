@@ -1,6 +1,6 @@
 # Phase 3 — Plan
 
-Status: 1 [x], 2 [x], 3 [~], 4 [ ], 5 [ ], 6 [ ]
+Status: 1 [x], 2 [x], 3 [~] (3.1 [ ], 3.2 [ ], 3.3 [ ], 3.4 [ ]), 4 [ ], 5 [ ], 6 [ ]
 
 ## 1. [x] Schema extension: tags + entities on nodes
 
@@ -35,33 +35,48 @@ Status: 1 [x], 2 [x], 3 [~], 4 [ ], 5 [ ], 6 [ ]
 
 **Demoable for sub-stage:** `pnpm --filter context-compiler test` green.
 
-## 3. [~] Benchmark harness + dataset + results
+## 3. [~] Benchmark harness + dataset + results — split into 3.1–3.4
 
-- `packages/context-compiler/benchmarks/dataset.ts`: ≥20 messages, each with metadata `{ id, text, source, domain, expectedAgents: string[] }`.
-  - **Domain mix (deliberate, not coding-only):** dev/coding, organizational comms (memos, multi-stakeholder letters, briefs), customer-support tickets that span specialist queues, research-assistant requests with multi-step subtasks. Stronger defensibility than yet-another-coding-benchmark.
-  - **Source mix:**
-    - ~6–8 from public chat dumps (ShareGPT, LMSYS-Chat-1M, WildChat). Real users, real noise. Cite source per entry.
-    - ~6–8 anonymized from the project author's own chat history (real branching multi-topic asks).
-    - ~6–8 AI-generated for specific edge-case coverage we can't find in the wild.
-  - **DACS coverage check:** read DACS paper examples, ensure each archetype they exercise is represented in our dataset (gap-fill, not source).
-  - All synthetic / AI-generated entries flagged in `findings.md`.
-- `benchmarks/agents.ts`: agent rosters for N=3, 5, 10 (id, description, system prompt, optional tag/entity filters). System prompt is what gets sent when the agent is actually invoked end-to-end.
-- `benchmarks/dataset.ts` per-message field: `expectedTasks: { agentId: string; expectedTask: string }[]` — feeds the output-quality judge.
-- `benchmarks/run.ts`: orchestrator. For each (message, N) cell, build per-agent context under each condition:
-  - **flat-broadcast baseline:** full message to every agent.
-  - **DACS focus-mode baseline:** focused agent (heuristic: highest-similarity agent description) gets full message, others get a 200-token summary (one Sonnet call to summarize).
-  - **tier-reader hybrid:** decompose message → for each agent, `route()` then `compile(budget, format)`.
-  - **ablations:** filter-only `route()`, embedding-only `route()`.
-- **End-to-end agent runs.** For each cell, actually invoke each agent with its assigned context (Haiku 4.5 by default; agent system prompt = its `domain` + `description`). Capture the agent's output. Token counts are real input/output token counts from the API, not estimates.
-- LLM-as-judge: Sonnet 4.6 evaluates two things per agent per condition:
-  - **Steering accuracy:** "does this slice contain what this agent needs to act on?" (judges the *input* the agent received).
-  - **Output quality:** "given this message's expected per-agent task, did the agent's output complete it correctly?" (judges the *output* the agent produced). Each dataset entry carries `expectedAgents: string[]` and a per-agent expected-task description used by this judge.
-  - Rubrics in `benchmarks/judge-prompts.ts`. Both judges return a 0–5 score plus a one-line rationale.
-- Embedding cache (decide here): if running cost is annoying, add a content-hash-keyed JSON cache under `benchmarks/.cache/`.
-- `pnpm bench` script runs the harness, writes `benchmarks/results.json`.
-- Findings writeup `benchmarks/findings.md`: summary table, observed wins/losses per condition, threats to validity.
+Split mid-phase after Pass A/B (commits `88b004e` … `984594c`) revealed the originally-monolithic group 3 was oversized. Already-landed work: harness scaffolding, cost guards, dataset stub (8 single-turn + 1 multi-turn), smoke run, judge model fix. See `packages/context-compiler/benchmarks/findings.md` for the gap list and the `route()` open investigation that motivated this split.
 
-**Demoable for sub-stage:** `pnpm bench` produces `results.json` with the success-signal table populated.
+The original sub-bullets of group 3 (dataset spec, agent rosters, run.ts orchestrator, end-to-end agent runs, LLM-as-judge, embedding cache, `pnpm bench` script, findings writeup) are now distributed across 3.1–3.4 below — bullets that already shipped are not restated.
+
+## 3.1 [ ] `route()` filter investigation + fix
+
+- Instrument `route()` to log `(entry-id, agent-id, step-A-survivors, step-B-survivors)` on at least one entry per domain represented in the current dataset stub.
+- Decide on the fix and apply it: filter relaxation (lowercased substring match, or fall back to embedding-only when step-A returns empty) vs dataset tag-vocabulary alignment with agent filters. Filter-relaxation is the more honest fix — agent filters in the wild won't be perfectly aligned with model-emitted tags either. Document the call.
+- Unit test the chosen behavior in `packages/context-compiler/test/`.
+- Re-run smoke (1 entry × N=3 × 5 conditions) and confirm `tier-hybrid` produces non-empty slices for at least one agent. Update `findings.md` "Open investigation" section to closed.
+
+**Demoable for sub-stage:** smoke re-run shows non-empty `tier-hybrid` slices; `findings.md` open-investigation section is resolved.
+
+## 3.2 [ ] Dataset to floor + DACS coverage
+
+- Public-dump entries: ~6–8 from ShareGPT / LMSYS-Chat-1M / WildChat with proper per-entry citations. Flag `synthetic: false`.
+- Hebrew author-history: translate the BringUp 5-turn arc + 1–2 other strong candidates from the `examples/maria-chats/` working set. Confirm Hebrew-judge feasibility or commit to English-translated-only entries.
+- DACS coverage check: cross-reference DACS paper archetype list against final dataset; gap-fill with AI-generated entries flagged `synthetic: true`.
+- Reach ≥20 entries (single-turn + multi-turn combined). Update anonymization mapping in `findings.md` if new third-party names surface.
+
+**Demoable for sub-stage:** `dataset.ts` exports ≥20 entries with sources cited; `findings.md` "Deferred / gap list" items 1, 2, 4, 5 closed.
+
+## 3.3 [ ] Multi-turn harness wiring
+
+- `runner.ts`: route per-turn over the running conversation tree (re-decompose each turn, re-route). Replace the current "skip multi-turn" path.
+- Propagation judge: Sonnet 4.6 evaluates whether facts established in earlier turns appear in the routed slice for the evaluated turn. Rubric added to `judge-prompts.ts`, returns 0–5 + one-line rationale.
+- Author at least 2 multi-turn entries beyond the existing schema stub.
+- Multi-turn signal section appended to `findings.md`.
+
+**Demoable for sub-stage:** `pnpm bench` no longer skips multi-turn entries; `results.json` contains a `multiTurn` section.
+
+## 3.4 [ ] Real bench run + writeup
+
+- Run full `pnpm bench` over the floor-met dataset across N=3, 5, 10 and all five conditions.
+- Populate the success-signal table in `findings.md` with real numbers (mean steering 0–5, mean output quality 0–5, mean input tokens / agent, wins vs flat, wins vs DACS).
+- Write the "Observed wins/losses" section: per-condition narrative tied to specific entry ids.
+- Refresh "Threats to validity" against what the real run actually exposed.
+- Decide whether `results.json` is committed (size + sensitivity check) or referenced by path only.
+
+**Demoable for sub-stage:** `findings.md` has a populated success-signal table and an observed-wins/losses section grounded in real numbers from a real `pnpm bench` run.
 
 ## 4. [ ] Playground agent-routing pane
 
