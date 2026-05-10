@@ -1,8 +1,14 @@
 # Benchmark findings — context-compiler v0.1
 
-> **Status:** harness scaffolded; dataset is AI-generated subset only. Public-dump
-> + author-history entries land in Pass B alongside the real `pnpm bench` run.
-> All numbers in this document are placeholders until that run completes.
+> **Status:** harness scaffolded; dataset has 7 AI-generated + 1 author-history
+> single-turn entry, plus 1 multi-turn schema-stub entry. Public-dump entries
+> and the real `pnpm bench` run land in subsequent passes. All numbers in this
+> document are placeholders until that run completes.
+>
+> **≥20-entry floor not yet met.** Current count is 9 entries (8 single-turn +
+> 1 multi-turn). This is intentional for this commit — see "Deferred" below.
+> The floor is reachable once public-dump entries land and additional
+> author-history candidates are translated from Hebrew.
 
 ## Setup
 
@@ -26,11 +32,69 @@
 ## Dataset
 
 - AI-generated edge cases (7): see `dataset.ts` `AI_GENERATED_ENTRIES`.
-- Public-dump entries: **TODO Pass B.**
-- Author-history entries: **TODO Pass B.**
-- DACS coverage check: **TODO Pass B** — pending paper link.
+- Author-history entries (1): `AUTHOR_HISTORY_ENTRIES`. Single-turn 3+-agent
+  fan-out from real chat history; verbatim user message with no third-party
+  named entities present.
+- Public-dump entries: **Deferred.** ShareGPT / LMSYS-Chat-1M / WildChat
+  pulls require dataset-viewer fetches with proper per-entry citation;
+  scoped as its own follow-up task rather than rushed inline.
+- DACS coverage check: **Deferred** — pending paper link + author-history
+  expansion (currently too few entries to gap-fill against).
 
 All AI-generated entries are flagged via `synthetic: true` for transparency.
+
+### Multi-turn sub-suite (schema stub)
+
+`MULTI_TURN_ENTRIES` defines a separate evaluation track that measures
+**cross-turn context propagation** — whether the routing system carries
+forward facts established in earlier turns when a later turn is routed.
+The benchmark-relevant signal: a router that re-decomposes the running tree
+each turn (tier-hybrid) preserves earlier facts; a flat-broadcast or
+DACS-focus baseline that only sees the latest message will miss them.
+
+Currently authored: 1 entry (`author-supercut-architecture-arc`) with two
+evaluation points (turn 0 — initial 5-agent fan-out; turn 2 — knowledge-base
+ask that requires turn-0 architecture facts to answer correctly).
+
+**Harness wiring is deferred.** `run.ts` does not yet route multi-turn
+entries; it skips them. The schema is in place so the design is reviewable
+and additional entries can be authored without further plumbing churn.
+
+### Anonymization
+
+The single included author entry contains no third-party personal names in
+its verbatim text and required no substitutions. The mapping defined for
+future entries is:
+
+- People: Achiya → VendorA-Person; any other named individuals → Person1, Person2…
+- Israeli automation vendors: STSICONIC → VendorB; Whale Group → VendorC;
+  Automotion → VendorD; Digital Beats AI → VendorE; Bllink → VendorF.
+- Lawtech: LawForce → LawTechA; Yodfat → LawTechB; Commit → LawTechC;
+  Cligal → LawTechD.
+- Clinic-software: Easybizy → ClinicSoftA; Medform → ClinicSoftB;
+  Tor4You → ClinicSoftC; T'fulit → ClinicSoftD.
+- Invoice-software: WellyBox → InvoiceSoftA; iCount → InvoiceSoftB;
+  Morning → InvoiceSoftC; Sumit → InvoiceSoftD.
+- Other: Midrag → FreelancerPlatform; Guesty → GlobalAirbnbSaaS.
+
+Names retained verbatim (project author's own): Maria, Noa, Kith,
+Super-Cut, BringUp.
+
+### Deferred — explicit gap list
+
+1. **Public-dump entries.** Need real per-entry citations from ShareGPT /
+   LMSYS-Chat-1M / WildChat. Network/fetch task.
+2. **Hebrew author conversations.** The strongest cross-turn-propagation
+   candidate (the BringUp building-management-software evaluation, 5 turns
+   spanning pre-meeting → post-meeting → value verdict) is in Hebrew and
+   currently skipped. Needs translation pass + Hebrew-judge feasibility
+   confirmation.
+3. **Multi-turn harness wiring in `run.ts`.** Per-turn route + per-evaluation
+   propagation judge. Schema is ready; `runner.ts` integration is the next
+   step.
+4. **DACS coverage check.** Needs the paper's archetype list cross-referenced
+   against final dataset once it has volume.
+5. **Reaching the ≥20 entry floor.** Resolved once 1+2 land.
 
 ## Success-signal table
 

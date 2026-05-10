@@ -256,7 +256,206 @@ export const AI_GENERATED_ENTRIES: DatasetEntry[] = [
   },
 ];
 
-/** Once Pass B lands the public-dump and author-history entries, this exports
- * the union. For now it returns the AI-generated subset so the harness can
- * still be wired up and tested end-to-end with stubs. */
-export const DATASET: DatasetEntry[] = [...AI_GENERATED_ENTRIES];
+/**
+ * Author chat-history entries (anonymized).
+ *
+ * Selection bar: each entry must fan out to ≥3 distinct agents in `agents.ts`.
+ * Source: real user messages from the project author's chat history. Names
+ * mapped to neutral placeholders per the anonymization log in `findings.md`.
+ * No third-party personal names appear in the verbatim text below.
+ */
+export const AUTHOR_HISTORY_ENTRIES: DatasetEntry[] = [
+  {
+    id: "author-vertical-brainstorm",
+    source: "author-chat-history (2026-04-29)",
+    synthetic: false,
+    domain: "research",
+    text: [
+      "Suggest a few.",
+      "",
+      "I also wonder about places like restaurants — what helps them to track their pipeline (order, use, bills etc).",
+      "",
+      "Also thinking about building an agent for a fitness program a friend and I are developing — like a supporter for your goal, knows you, suggests diet-aware recipes, has the program's info etc. This is something we'll talk about more tomorrow (you can react in a few words — if it's been done a lot, or is it good), but I wonder if there could be more supporters in all sorts of situations you are willing to pay to have in the palm of your hand.",
+      "",
+      "I'm also thinking about another friend complaining about the tedious bureaucracy in getting permits for rebuilding their apartment in Tel Aviv — and changing the outline of the apartment (lots of documents and back-and-forth with the Municipal Building office). Maybe there are even more options.",
+    ].join("\n"),
+    expectedAgents: ["product-pm", "backend-api", "research-writing"],
+    expectedTasks: [
+      {
+        agentId: "product-pm",
+        expectedTask:
+          "Triage the three product avenues (restaurant pipeline, personal-fitness agent, permit-bureaucracy assistant) and recommend which (if any) is worth pursuing, with one-line rationale per avenue.",
+      },
+      {
+        agentId: "backend-api",
+        expectedTask:
+          "Sketch the technical shape of each avenue at a high level: integration surface for restaurant POS/billing, agent-state model for a fitness coach, and document-flow integrations needed for a Tel Aviv permit assistant.",
+      },
+      {
+        agentId: "research-writing",
+        expectedTask:
+          "Indicate market-saturation status for each avenue (has this been done a lot or not), citing what's known vs. requires deeper research.",
+      },
+    ],
+  },
+];
+
+export const DATASET: DatasetEntry[] = [
+  ...AI_GENERATED_ENTRIES,
+  ...AUTHOR_HISTORY_ENTRIES,
+];
+
+// ---------------------------------------------------------------------------
+// Multi-turn schema (sub-suite B — STUB ONLY in this commit).
+//
+// Goal: measure whether the routing system propagates facts established in
+// earlier turns when a later turn is routed. The DACS-style "focus mode"
+// baseline and the flat-broadcast baseline both have known propagation
+// failure modes; tier-reader's hybrid route+compile is hypothesized to
+// preserve cross-turn facts because the running tree accumulates them.
+//
+// Harness wiring is intentionally NOT in this commit. The dataset shape is
+// defined here so the design is reviewable, and one representative entry
+// is authored. The benchmark `run.ts` will gain multi-turn support in a
+// follow-up group (tracked in findings.md "Deferred").
+// ---------------------------------------------------------------------------
+
+/** A single user turn in a multi-turn conversation. */
+export interface ConversationTurn {
+  /** 0-indexed position in the conversation. */
+  turnIndex: number;
+  /** The user message verbatim (anonymized per findings.md mapping). */
+  text: string;
+}
+
+/** A measurement point: route + judge at a given turn, given turns 0..atTurn. */
+export interface MultiTurnEvaluation {
+  /** Which turn we route + judge. Turns 0..atTurn are visible to the system. */
+  atTurn: number;
+  /**
+   * Facts from turns < atTurn that any agent's slice MUST contain to
+   * answer the turn's task correctly. The propagation judge scores
+   * coverage of these facts in the routed slice.
+   */
+  requiredPriorContext: string[];
+  /** Agent ids expected to receive a non-empty slice at this evaluation. */
+  expectedAgents: string[];
+  /** Per-agent expected outcome — fed to the output-quality judge. */
+  expectedTasks: ExpectedTask[];
+}
+
+export interface MultiTurnEntry {
+  id: string;
+  source: string;
+  /** Multi-turn entries are not synthetic (they're real conversations). */
+  synthetic: false;
+  domain: Domain;
+  turns: ConversationTurn[];
+  evaluations: MultiTurnEvaluation[];
+}
+
+export const MULTI_TURN_ENTRIES: MultiTurnEntry[] = [
+  {
+    id: "author-supercut-architecture-arc",
+    source: "author-chat-history (2026-03-16, Portfolio chatbot conversation)",
+    synthetic: false,
+    domain: "dev",
+    turns: [
+      {
+        turnIndex: 0,
+        text: [
+          "Regarding this last:",
+          "",
+          "UX Designer & Frontend Developer | AI Video Editor Startup (stealth, co-founder) Feb 2026 – Present · Pre-seed, 3-person founding team. Co-founding a voice-first AI video editor that lets professional editors direct cuts through natural-language speech.",
+          "",
+          "It is named Super-Cut. I do brand and front + workflow + editing context engineering (since instructions from the user could be in different sessions and different screens — and it could be long — I think we should manage a project.md and come up with good ways to deal with that as well).",
+          "",
+          "We write with TypeScript + something called Electron (or something similar) that wraps it for desktop use. We have a DB (probably Postgres locally to handle metadata regarding the assets — maybe it should be a private file rather than a DB).",
+          "",
+          "The backend is responsible for all Gemini / Whisper communication and the actual building of video. The frontend is responsible for:",
+          "1. Local assets management (categorizing)",
+          "2. Compression of files and frames fetch from FFmpeg (it will be a service the frontend does — like a small backend for the front doing this operation to send to the real backend)",
+          "3. Conversation with Anthropic SDK for editing",
+          "4. What do you think?",
+        ].join("\n"),
+      },
+      {
+        turnIndex: 1,
+        text: [
+          "Q: Good to update the CV with this entry?",
+          "A: Keep it even shorter — 2 lines max.",
+          "",
+          "Q: Want to dig into the context engineering architecture?",
+          "A: Not now — save it for a dedicated session.",
+        ].join("\n"),
+      },
+      {
+        turnIndex: 2,
+        text:
+          "I need a text to explain Claude about Super-Cut and my role there — for the portfolio assistant knowledge base.",
+      },
+    ],
+    evaluations: [
+      {
+        atTurn: 0,
+        requiredPriorContext: [],
+        expectedAgents: [
+          "frontend-ui",
+          "backend-api",
+          "data-analytics",
+          "product-pm",
+          "research-writing",
+        ],
+        expectedTasks: [
+          {
+            agentId: "frontend-ui",
+            expectedTask:
+              "Confirm whether Electron + TypeScript + an FFmpeg-as-mini-backend service + Anthropic SDK chat layer is a coherent frontend shape for a desktop video editor.",
+          },
+          {
+            agentId: "backend-api",
+            expectedTask:
+              "Define the contract between the frontend and the backend that owns Gemini/Whisper/video assembly, including which calls cross the boundary.",
+          },
+          {
+            agentId: "data-analytics",
+            expectedTask:
+              "Recommend Postgres-local vs. a private file for asset metadata, and sketch the schema either way.",
+          },
+          {
+            agentId: "product-pm",
+            expectedTask:
+              "Lock the frontend-vs-backend ownership boundary so the two co-founders' scopes do not overlap or drop work.",
+          },
+          {
+            agentId: "research-writing",
+            expectedTask:
+              "Address the cross-session context-engineering problem (project.md pattern) — propose a two-layer state design (full project file + per-session summary).",
+          },
+        ],
+      },
+      {
+        atTurn: 2,
+        requiredPriorContext: [
+          "The project's name is Super-Cut.",
+          "Stack: Electron + TypeScript desktop app; Anthropic SDK on frontend; Gemini + Whisper + video assembly on backend; FFmpeg as a frontend-side media-prep service.",
+          "Maria's scope: brand, frontend, workflow, editing context engineering. Co-founder owns backend (Gemini/Whisper/assembly).",
+          "Context-engineering pattern was deferred to a dedicated session per turn 1; the project.md two-layer idea is the open thread.",
+        ],
+        expectedAgents: ["research-writing", "product-pm"],
+        expectedTasks: [
+          {
+            agentId: "research-writing",
+            expectedTask:
+              "Draft a knowledge-base section about Super-Cut and Maria's role that names the real stack (Electron, TypeScript, FFmpeg, Anthropic SDK) and her actual responsibilities (brand, frontend, context engineering) — not generic.",
+          },
+          {
+            agentId: "product-pm",
+            expectedTask:
+              "Frame the role as a co-founder at pre-seed without overclaiming shipped deliverables.",
+          },
+        ],
+      },
+    ],
+  },
+];
