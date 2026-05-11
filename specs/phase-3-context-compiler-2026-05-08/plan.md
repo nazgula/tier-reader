@@ -1,6 +1,6 @@
 # Phase 3 — Plan
 
-Status: 1 [x], 2 [x], 3 [~] (3.1 [x], 3.2 [x], 3.3 [ ], 3.4 [ ]), 4 [ ], 5 [ ], 6 [ ]
+Status: 1 [x], 2 [x], 3 [~] (3.1 [x], 3.2 [x], 3.3 [~], 3.4 [ ]), 4 [ ], 5 [ ], 6 [ ]
 
 ## 1. [x] Schema extension: tags + entities on nodes
 
@@ -59,7 +59,7 @@ The original sub-bullets of group 3 (dataset spec, agent rosters, run.ts orchest
 
 **Demoable for sub-stage:** `dataset.ts` exports 13 entries (partial dataset, flagged as such) with sources cited; `findings.md` "Deferred / gap list" items 1, 2, 4 closed; item 5 reframed to conditional re-enlargement.
 
-## 3.3 [ ] Multi-turn harness wiring
+## 3.3 [~] Multi-turn harness wiring
 
 - `runner.ts`: route per-turn over the running conversation tree (re-decompose each turn, re-route). Replace the current "skip multi-turn" path.
 - Propagation judge: Sonnet 4.6 evaluates whether facts established in earlier turns appear in the routed slice for the evaluated turn. Rubric added to `judge-prompts.ts`, returns 0–5 + one-line rationale.

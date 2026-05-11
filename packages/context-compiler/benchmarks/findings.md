@@ -122,10 +122,33 @@ Currently authored (2 entries, both real conversations):
 BringUp arc directly without translation; bench cost is unchanged.
 Decision recorded here so 3.4's run can confirm or revise.
 
-**Harness wiring is deferred to 3.3.** `run.ts` does not yet route
-multi-turn entries; it skips them. The schema is in place so the design
-is reviewable and additional entries can be authored without further
-plumbing churn.
+**Harness wiring landed in 3.3.** `run.ts` now iterates
+`MULTI_TURN_ENTRIES` after the single-turn pass. For each
+`MultiTurnEvaluation` the orchestrator:
+
+1. Concatenates turns `0..atTurn` (each prefixed with a `Turn N:` marker)
+   into one source text, then re-decomposes that text via
+   `decomposeFn`. The decomposer sees the turn boundaries explicitly,
+   so the running tree accumulates earlier-turn facts as top-level or
+   nested subtrees that `route()` can match.
+2. Builds slices for every (roster size × condition) cell using the
+   same `buildSlices()` path as single-turn entries — flat-broadcast
+   and DACS-focus baselines see the same concatenated text, so any
+   propagation advantage `tier-hybrid` shows over them is attributable
+   to routing-on-the-running-tree, not to seeing extra source.
+3. Runs the agent + the existing steering and output-quality judges,
+   plus a third **propagation judge** (Sonnet 4.6) that scores 0–5
+   how many of `evaluation.requiredPriorContext` facts appear in the
+   slice the agent received. Seed turns (empty `requiredPriorContext`)
+   record `propagation: null` rather than fabricating a perfect score.
+
+Results land under `results.json` → `multiTurn.cells`, keyed
+`(entryId, atTurn, rosterSize, condition, agentId)`. Resume support is
+in place: a partial run is restartable without redoing completed
+multi-turn cells.
+
+The real signal — whether `tier-hybrid` actually propagates better
+than `flat-broadcast` and `dacs-focus` — lands in 3.4.
 
 ### Anonymization
 

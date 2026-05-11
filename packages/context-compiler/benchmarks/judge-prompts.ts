@@ -9,7 +9,7 @@
  * sending.
  */
 
-export type JudgeKind = "steering" | "output";
+export type JudgeKind = "steering" | "output" | "propagation";
 
 export interface JudgeInput {
   /** Original message the agent rosters were responding to. */
@@ -44,6 +44,54 @@ const OUTPUT_RUBRIC = `Score 0–5:
   2 — Partially addresses the task; major omissions.
   1 — Tangentially related; does not complete the task.
   0 — Does not address the expected task at all.`;
+
+export interface PropagationJudgeInput {
+  /** Identifier of the evaluated agent — kept for parity with other judges. */
+  agentId: string;
+  agentDescription: string;
+  /**
+   * Facts established in earlier turns that the routed slice for the current
+   * turn must surface. One bullet per fact.
+   */
+  requiredPriorContext: string[];
+  /** Slice of context the agent received for this turn. */
+  contextGiven: string;
+}
+
+const PROPAGATION_RUBRIC = `Score 0–5 by fraction of required prior facts present in the slice:
+  5 — All required prior facts are explicitly present (verbatim or unambiguous paraphrase).
+  4 — All but one fact present, or all present but one is only weakly implied.
+  3 — Roughly half the required facts present.
+  2 — A minority of required facts present; most are missing.
+  1 — At most one fact present; the slice is effectively starting from scratch.
+  0 — No required prior facts present.`;
+
+export function buildPropagationPrompt(input: PropagationJudgeInput): string {
+  const facts = input.requiredPriorContext.map((f, i) => `  ${i + 1}. ${f}`).join("\n");
+  return [
+    `You are evaluating whether facts established in earlier conversation turns`,
+    `propagated into the routed context slice that a specialist agent receives`,
+    `for the current turn.`,
+    ``,
+    `Agent under evaluation:`,
+    `  id: ${input.agentId}`,
+    `  description: ${input.agentDescription}`,
+    ``,
+    `Required prior facts (established in earlier turns):`,
+    facts,
+    ``,
+    `Context slice the agent received for the current turn:`,
+    `"""`,
+    input.contextGiven,
+    `"""`,
+    ``,
+    `Question: how many of the required prior facts are present in the slice?`,
+    ``,
+    PROPAGATION_RUBRIC,
+    ``,
+    `Respond as strict JSON: {"score": <int 0-5>, "rationale": "<one sentence>"}`,
+  ].join("\n");
+}
 
 export function buildSteeringPrompt(input: JudgeInput): string {
   return [

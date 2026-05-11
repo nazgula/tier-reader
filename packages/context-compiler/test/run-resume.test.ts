@@ -5,7 +5,7 @@ import type { Tree } from "@tier-reader/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runBench } from "../benchmarks/run.js";
 import type { LLMRunner } from "../benchmarks/runner.js";
-import type { DatasetEntry } from "../benchmarks/dataset.js";
+import type { DatasetEntry, MultiTurnEntry } from "../benchmarks/dataset.js";
 import type { Embedder } from "../src/index.js";
 import { buildTree, fixedEmbedder } from "./helpers.js";
 import { ROSTER_3 } from "../benchmarks/agents.js";
@@ -131,6 +131,107 @@ describe("runBench", () => {
     // Resume should produce zero new agent or judge calls.
     expect(calls2).toEqual([]);
     expect(out.cells).toHaveLength(15);
+  });
+
+  it("runs multi-turn entries and records propagation verdicts", async () => {
+    const calls: string[] = [];
+    const mt: MultiTurnEntry = {
+      id: "mt-test-1",
+      source: "test",
+      synthetic: false,
+      domain: "dev",
+      turns: [
+        { turnIndex: 0, text: "seed turn establishing facts" },
+        { turnIndex: 1, text: "follow-up turn that needs prior context" },
+      ],
+      evaluations: [
+        {
+          atTurn: 0,
+          requiredPriorContext: [],
+          expectedAgents: ["frontend-ui"],
+          expectedTasks: [{ agentId: "frontend-ui", expectedTask: "seed task" }],
+        },
+        {
+          atTurn: 1,
+          requiredPriorContext: ["Fact A from turn 0.", "Fact B from turn 0."],
+          expectedAgents: ["backend-api"],
+          expectedTasks: [{ agentId: "backend-api", expectedTask: "follow-up task" }],
+        },
+      ],
+    };
+
+    const out = await runBench({
+      agentRunner: stubAgentRunner(calls),
+      judgeRunner: stubJudgeRunner(calls),
+      embedder: EMBED,
+      entries: [],
+      multiTurnEntries: [mt],
+      rosterSizes: [3],
+      outPath: join(tmp, "results.json"),
+      decomposeFn: async () => TREE,
+      log: () => {},
+    });
+
+    // 2 evaluations × 5 conditions × 3 agents = 30 multi-turn cells.
+    expect(out.multiTurn.cells).toHaveLength(30);
+
+    const seed = out.multiTurn.cells.filter((c) => c.atTurn === 0);
+    const followUp = out.multiTurn.cells.filter((c) => c.atTurn === 1);
+    expect(seed.every((c) => c.propagation === null)).toBe(true);
+    expect(followUp.every((c) => c.propagation !== null && c.propagation.score === 4)).toBe(
+      true,
+    );
+
+    const persisted = JSON.parse(readFileSync(join(tmp, "results.json"), "utf8"));
+    expect(persisted.multiTurn.cells).toHaveLength(30);
+  });
+
+  it("resumes multi-turn cells across runs without redoing work", async () => {
+    const path = join(tmp, "results.json");
+    const mt: MultiTurnEntry = {
+      id: "mt-resume",
+      source: "test",
+      synthetic: false,
+      domain: "dev",
+      turns: [{ turnIndex: 0, text: "only turn" }],
+      evaluations: [
+        {
+          atTurn: 0,
+          requiredPriorContext: [],
+          expectedAgents: ["frontend-ui"],
+          expectedTasks: [{ agentId: "frontend-ui", expectedTask: "x" }],
+        },
+      ],
+    };
+
+    await runBench({
+      agentRunner: stubAgentRunner([]),
+      judgeRunner: stubJudgeRunner([]),
+      embedder: EMBED,
+      entries: [],
+      multiTurnEntries: [mt],
+      rosterSizes: [3],
+      outPath: path,
+      decomposeFn: async () => TREE,
+      log: () => {},
+    });
+
+    const calls2: string[] = [];
+    const out = await runBench({
+      agentRunner: stubAgentRunner(calls2),
+      judgeRunner: stubJudgeRunner(calls2),
+      embedder: EMBED,
+      entries: [],
+      multiTurnEntries: [mt],
+      rosterSizes: [3],
+      outPath: path,
+      resume: true,
+      decomposeFn: async () => TREE,
+      log: () => {},
+    });
+
+    expect(calls2).toEqual([]);
+    expect(out.multiTurn.cells).toHaveLength(15);
   });
 
   it("persists partial results when an LLM call throws (e.g., budget exceeded)", async () => {

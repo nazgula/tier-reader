@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildOutputPrompt,
+  buildPropagationPrompt,
   buildSteeringPrompt,
   parseVerdict,
 } from "../benchmarks/judge-prompts.js";
@@ -27,6 +28,23 @@ describe("judge prompts", () => {
     expect(() => buildOutputPrompt(BASE)).toThrow();
     const out = buildOutputPrompt({ ...BASE, agentOutput: "agent's reply" });
     expect(out).toContain("agent's reply");
+  });
+
+  it("propagation prompt embeds agent identity, required prior facts, and slice", () => {
+    const out = buildPropagationPrompt({
+      agentId: "research-writing",
+      agentDescription: "Research specialist",
+      requiredPriorContext: [
+        "The project's name is Super-Cut.",
+        "Stack is Electron + TypeScript.",
+      ],
+      contextGiven: "context slice",
+    });
+    expect(out).toContain("research-writing");
+    expect(out).toContain("Super-Cut");
+    expect(out).toContain("Electron + TypeScript");
+    expect(out).toContain("context slice");
+    expect(out).toMatch(/Score 0–5/);
   });
 });
 

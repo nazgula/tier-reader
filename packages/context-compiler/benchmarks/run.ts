@@ -5,7 +5,12 @@ import { aiSdkProvider, decompose } from "@tier-reader/core";
 import { type Embedder, cachedEmbedder, voyageEmbedder } from "../src/index.js";
 import { ROSTERS, type RosterSize } from "./agents.js";
 import { type AgentSlice, type ConditionId, buildSlices } from "./conditions.js";
-import { DATASET, type DatasetEntry } from "./dataset.js";
+import {
+  DATASET,
+  type DatasetEntry,
+  MULTI_TURN_ENTRIES,
+  type MultiTurnEntry,
+} from "./dataset.js";
 import {
   DEFAULT_BUDGETS,
   TokenBudgetExceededError,
@@ -15,6 +20,7 @@ import {
 import {
   type JudgeVerdict,
   buildOutputPrompt,
+  buildPropagationPrompt,
   buildSteeringPrompt,
   parseVerdict,
 } from "./judge-prompts.js";
@@ -47,6 +53,22 @@ interface CellResult {
   outputQuality: JudgeVerdict;
 }
 
+interface MultiTurnCellResult {
+  entryId: string;
+  atTurn: number;
+  rosterSize: RosterSize;
+  condition: ConditionId;
+  agentId: string;
+  expected: boolean;
+  contextChars: number;
+  inputTokens: number;
+  outputTokens: number;
+  output: string;
+  steering: JudgeVerdict;
+  outputQuality: JudgeVerdict;
+  propagation: JudgeVerdict | null;
+}
+
 interface BenchOutput {
   generatedAt: string;
   budget: number;
@@ -54,6 +76,7 @@ interface BenchOutput {
   conditions: ConditionId[];
   rosterSizes: RosterSize[];
   cells: CellResult[];
+  multiTurn: { cells: MultiTurnCellResult[] };
 }
 
 export interface RunBenchOpts {
@@ -62,6 +85,8 @@ export interface RunBenchOpts {
   embedder?: Embedder;
   /** Optional override; defaults to all dataset entries. */
   entries?: DatasetEntry[];
+  /** Optional override; defaults to all multi-turn entries. Pass `[]` to skip. */
+  multiTurnEntries?: MultiTurnEntry[];
   rosterSizes?: RosterSize[];
   budget?: number;
   /** Where to write results.json. Default: benchmarks/results.json. */
@@ -86,18 +111,23 @@ export interface RunBenchOpts {
 export async function runBench(opts: RunBenchOpts): Promise<BenchOutput> {
   const log = opts.log ?? ((m: string) => process.stderr.write(`${m}\n`));
   const entries = opts.entries ?? DATASET;
+  const multiTurnEntries = opts.multiTurnEntries ?? MULTI_TURN_ENTRIES;
   const rosterSizes = opts.rosterSizes ?? DEFAULT_ROSTERS;
   const budget = opts.budget ?? DEFAULT_BUDGET;
   const outPath = opts.outPath ?? resolve(here, "results.json");
   const decomposeFn = opts.decomposeFn ?? defaultDecompose;
   const embedder = opts.embedder ?? defaultEmbedder();
 
-  const existingCells: CellResult[] = opts.resume ? loadExisting(outPath) : [];
-  const completed = new Set(existingCells.map(cellKey));
-  const cells: CellResult[] = [...existingCells];
+  const existing = opts.resume ? loadExisting(outPath) : { cells: [], multiTurn: [] };
+  const completed = new Set(existing.cells.map(cellKey));
+  const mtCompleted = new Set(existing.multiTurn.map(mtCellKey));
+  const cells: CellResult[] = [...existing.cells];
+  const mtCells: MultiTurnCellResult[] = [...existing.multiTurn];
 
-  if (opts.resume && existingCells.length > 0) {
-    log(`[resume] loaded ${existingCells.length} cells from ${outPath}`);
+  if (opts.resume && (existing.cells.length > 0 || existing.multiTurn.length > 0)) {
+    log(
+      `[resume] loaded ${existing.cells.length} single-turn + ${existing.multiTurn.length} multi-turn cells from ${outPath}`,
+    );
   }
 
   try {
@@ -157,10 +187,74 @@ export async function runBench(opts: RunBenchOpts): Promise<BenchOutput> {
             cells.push(cell);
             completed.add(cellKey(cell));
             // Persist after each cell so a budget-exceeded crash doesn't lose work.
-            persist(outPath, makeOutput(budget, rosterSizes, cells));
+            persist(outPath, makeOutput(budget, rosterSizes, cells, mtCells));
             log(
               `  N=${N} ${cond} ${agent.id} steering=${cell.steering.score} output=${cell.outputQuality.score}`,
             );
+          }
+        }
+      }
+    }
+
+    for (const mtEntry of multiTurnEntries) {
+      log(`[multi-turn] ${mtEntry.id}`);
+      for (const ev of mtEntry.evaluations) {
+        // Combined text = all turns 0..atTurn separated by explicit markers,
+        // so the decomposer can see the turn boundaries.
+        const combinedText = mtEntry.turns
+          .filter((t) => t.turnIndex <= ev.atTurn)
+          .map((t) => `Turn ${t.turnIndex}:\n${t.text}`)
+          .join("\n\n");
+
+        let tree: Awaited<ReturnType<typeof decompose>> | null = null;
+        let dacsSummary: string | null = null;
+
+        for (const N of rosterSizes) {
+          const roster = ROSTERS[N];
+          for (const cond of CONDITIONS) {
+            const remainingAgents = roster.filter(
+              (a) => !mtCompleted.has(makeMTKey(mtEntry.id, ev.atTurn, N, cond, a.id)),
+            );
+            if (remainingAgents.length === 0) continue;
+
+            if (!tree) tree = await decomposeFn(combinedText);
+            if (dacsSummary === null) {
+              dacsSummary = await summarize(opts.agentRunner, combinedText);
+            }
+
+            const slices = await buildSlices(cond, {
+              sourceMessage: combinedText,
+              tree,
+              roster,
+              embedder,
+              budget,
+              dacsSummary,
+            });
+
+            for (const agent of remainingAgents) {
+              const slice = slices.find((s) => s.agentId === agent.id);
+              if (!slice) continue;
+
+              const cell = await runOneMultiTurnCell({
+                entry: mtEntry,
+                evaluation: ev,
+                agent,
+                slice,
+                condition: cond,
+                rosterSize: N,
+                combinedText,
+                agentRunner: opts.agentRunner,
+                judgeRunner: opts.judgeRunner,
+              });
+              mtCells.push(cell);
+              mtCompleted.add(mtCellKey(cell));
+              persist(outPath, makeOutput(budget, rosterSizes, cells, mtCells));
+              const propScore = cell.propagation ? cell.propagation.score : "-";
+              log(
+                `  turn=${ev.atTurn} N=${N} ${cond} ${agent.id} ` +
+                  `steering=${cell.steering.score} output=${cell.outputQuality.score} prop=${propScore}`,
+              );
+            }
           }
         }
       }
@@ -172,9 +266,11 @@ export async function runBench(opts: RunBenchOpts): Promise<BenchOutput> {
     throw err;
   }
 
-  const out = makeOutput(budget, rosterSizes, cells);
+  const out = makeOutput(budget, rosterSizes, cells, mtCells);
   persist(outPath, out);
-  log(`[done] wrote ${outPath} (${cells.length} cells)`);
+  log(
+    `[done] wrote ${outPath} (${cells.length} single-turn + ${mtCells.length} multi-turn cells)`,
+  );
   return out;
 }
 
@@ -182,6 +278,7 @@ function makeOutput(
   budget: number,
   rosterSizes: RosterSize[],
   cells: CellResult[],
+  mtCells: MultiTurnCellResult[],
 ): BenchOutput {
   return {
     generatedAt: new Date().toISOString(),
@@ -190,6 +287,7 @@ function makeOutput(
     conditions: CONDITIONS,
     rosterSizes,
     cells,
+    multiTurn: { cells: mtCells },
   };
 }
 
@@ -198,13 +296,18 @@ function persist(outPath: string, out: BenchOutput): void {
   writeFileSync(outPath, JSON.stringify(out, null, 2));
 }
 
-function loadExisting(outPath: string): CellResult[] {
-  if (!existsSync(outPath)) return [];
+function loadExisting(outPath: string): { cells: CellResult[]; multiTurn: MultiTurnCellResult[] } {
+  if (!existsSync(outPath)) return { cells: [], multiTurn: [] };
   try {
-    const parsed = JSON.parse(readFileSync(outPath, "utf8")) as BenchOutput;
-    return Array.isArray(parsed.cells) ? parsed.cells : [];
+    const parsed = JSON.parse(readFileSync(outPath, "utf8")) as Partial<BenchOutput>;
+    const cells = Array.isArray(parsed.cells) ? (parsed.cells as CellResult[]) : [];
+    const multiTurn =
+      parsed.multiTurn && Array.isArray(parsed.multiTurn.cells)
+        ? (parsed.multiTurn.cells as MultiTurnCellResult[])
+        : [];
+    return { cells, multiTurn };
   } catch {
-    return [];
+    return { cells: [], multiTurn: [] };
   }
 }
 
@@ -219,6 +322,26 @@ function makeKey(
   agentId: string,
 ): string {
   return `${entryId}|${rosterSize}|${condition}|${agentId}`;
+}
+
+function mtCellKey(c: {
+  entryId: string;
+  atTurn: number;
+  rosterSize: RosterSize;
+  condition: ConditionId;
+  agentId: string;
+}): string {
+  return makeMTKey(c.entryId, c.atTurn, c.rosterSize, c.condition, c.agentId);
+}
+
+function makeMTKey(
+  entryId: string,
+  atTurn: number,
+  rosterSize: RosterSize,
+  condition: ConditionId,
+  agentId: string,
+): string {
+  return `${entryId}@${atTurn}|${rosterSize}|${condition}|${agentId}`;
 }
 
 async function defaultDecompose(text: string) {
@@ -322,6 +445,99 @@ async function judge(
   return parseVerdict(text);
 }
 
+async function judgePropagation(
+  runner: LLMRunner,
+  input: Parameters<typeof buildPropagationPrompt>[0],
+): Promise<JudgeVerdict> {
+  const { text } = await runner.run({
+    systemPrompt:
+      "You are a strict evaluator. Respond with valid JSON only — no commentary, no code fences.",
+    userPrompt: buildPropagationPrompt(input),
+    model: BENCH_MODELS.judge,
+    temperature: 0,
+  });
+  return parseVerdict(text);
+}
+
+async function runOneMultiTurnCell(args: {
+  entry: MultiTurnEntry;
+  evaluation: MultiTurnEntry["evaluations"][number];
+  agent: { id: string; description: string; systemPrompt: string };
+  slice: AgentSlice;
+  condition: ConditionId;
+  rosterSize: RosterSize;
+  combinedText: string;
+  agentRunner: LLMRunner;
+  judgeRunner: LLMRunner;
+}): Promise<MultiTurnCellResult> {
+  const { entry, evaluation, agent, slice, condition, rosterSize, combinedText } = args;
+  const expected = evaluation.expectedAgents.includes(agent.id);
+  const expectedTask =
+    evaluation.expectedTasks.find((t) => t.agentId === agent.id)?.expectedTask ??
+    "(no expected task)";
+
+  let agentText = "";
+  let inputTokens = 0;
+  let outputTokens = 0;
+  if (slice.text.trim().length > 0) {
+    const result = await args.agentRunner.run({
+      systemPrompt: agent.systemPrompt,
+      userPrompt: slice.text,
+      temperature: 0,
+    });
+    agentText = result.text;
+    inputTokens = result.inputTokens;
+    outputTokens = result.outputTokens;
+  }
+
+  const steering = await judge(args.judgeRunner, "steering", {
+    sourceMessage: combinedText,
+    agentId: agent.id,
+    agentDescription: agent.description,
+    expectedTask,
+    contextGiven: slice.text,
+  });
+
+  const outputQuality = await judge(args.judgeRunner, "output", {
+    sourceMessage: combinedText,
+    agentId: agent.id,
+    agentDescription: agent.description,
+    expectedTask,
+    contextGiven: slice.text,
+    agentOutput: agentText,
+  });
+
+  // Propagation judge only applies when there's prior context to propagate
+  // (i.e. atTurn > 0 with non-empty requiredPriorContext). For the seed turn
+  // there's nothing to propagate and we record null rather than fabricating
+  // a perfect score.
+  const propagation =
+    evaluation.requiredPriorContext.length > 0
+      ? await judgePropagation(args.judgeRunner, {
+          agentId: agent.id,
+          agentDescription: agent.description,
+          requiredPriorContext: evaluation.requiredPriorContext,
+          contextGiven: slice.text,
+        })
+      : null;
+
+  return {
+    entryId: entry.id,
+    atTurn: evaluation.atTurn,
+    rosterSize,
+    condition,
+    agentId: agent.id,
+    expected,
+    contextChars: slice.text.length,
+    inputTokens,
+    outputTokens,
+    output: agentText,
+    steering,
+    outputQuality,
+    propagation,
+  };
+}
+
 // CLI entry — `tsx benchmarks/run.ts [--smoke] [--resume]`
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 if (isMain) {
@@ -342,7 +558,11 @@ if (isMain) {
   });
 
   const subset = smoke
-    ? { entries: DATASET.slice(0, 1), rosterSizes: [3] as RosterSize[] }
+    ? {
+        entries: DATASET.slice(0, 1),
+        multiTurnEntries: MULTI_TURN_ENTRIES.slice(0, 1),
+        rosterSizes: [3] as RosterSize[],
+      }
     : {};
 
   runBench({
