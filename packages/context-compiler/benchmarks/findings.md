@@ -5,10 +5,15 @@
 > BringUp Hebrew arc). Real `pnpm bench` run lands in 3.4. All numbers in this
 > document are placeholders until that run completes.
 >
-> **≥20-entry floor not yet met.** Current count is 13 entries (11 single-turn
-> + 2 multi-turn). Remaining ~7+ entries land in the next 3.2 batch from
-> further `examples/maria-chats/` mining and additional DACS-archetype
-> gap-fill synthetics.
+> **Partial dataset shipped at 13 entries** (11 single-turn + 2 multi-turn).
+> The originally-targeted ≥20 floor was relaxed during 3.2 replan: the
+> public-dump path was dropped on methodological grounds (see "Dataset"
+> below), and a re-screen of additional author-history candidates did
+> not yield qualifying multi-agent-fan-out entries. Re-enlargement is
+> **conditional on positive signal in 3.4** — if the real bench run
+> shows tier-hybrid wins worth strengthening, the debugging-fan-out and
+> clinical-methodology gaps flagged in the DACS coverage table are the
+> first targets for additional entries.
 
 ## Setup
 
@@ -159,10 +164,18 @@ Super-Cut, BringUp.
 4. ~~**DACS coverage check.**~~ **Closed (3.2)** — coverage table in
    "Dataset → DACS coverage" above; two synthetic entries added to fill
    research-survey and data-processing/ETL gaps.
-5. **Reaching the ≥20 entry floor.** Currently at 13. Remaining ~7+
-   entries from further `examples/maria-chats/` mining (single-turn
-   extracts) + 1–2 more DACS-archetype gap-fill synthetics
-   (debugging-fan-out, clinical-methodology) in the next 3.2 batch.
+5. **Partial dataset (13 entries) shipped; re-enlarge if 3.4 signal
+   warrants.** The originally-targeted ≥20 floor was relaxed during 3.2
+   replan. Public-dump path is dropped (item 1 above). A re-screen of
+   `examples/tier-reader-benchmark-picks-examples/new/` produced no
+   additional qualifying multi-agent-fan-out candidates (first user
+   turns were single-domain). If 3.4's real bench run produces a
+   positive signal on tier-hybrid, the **debugging-fan-out** and
+   **clinical-methodology** gaps flagged in the DACS coverage table are
+   the first targets for additional synthetic entries, alongside any
+   further `examples/maria-chats/` mining. If 3.4 does not produce a
+   positive signal, the partial-dataset framing stands as a documented
+   limitation in the writeup.
 
 ## Success-signal table
 

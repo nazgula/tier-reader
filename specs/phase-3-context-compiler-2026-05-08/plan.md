@@ -55,9 +55,9 @@ The original sub-bullets of group 3 (dataset spec, agent rosters, run.ts orchest
 - Public-dump entries: ~6–8 from ShareGPT / LMSYS-Chat-1M / WildChat with proper per-entry citations. Flag `synthetic: false`.
 - Hebrew author-history: translate the BringUp 5-turn arc + 1–2 other strong candidates from the `examples/maria-chats/` working set. Confirm Hebrew-judge feasibility or commit to English-translated-only entries.
 - DACS coverage check: cross-reference DACS paper archetype list against final dataset; gap-fill with AI-generated entries flagged `synthetic: true`.
-- Reach ≥20 entries (single-turn + multi-turn combined). Update anonymization mapping in `findings.md` if new third-party names surface.
+- Ship at **13 entries (partial dataset)** rather than the originally-targeted ≥20. Rationale: public-dump path was dropped on methodological grounds (recorded in `findings.md` → "Dataset"), and a re-screen of `examples/tier-reader-benchmark-picks-examples/new/` produced no additional qualifying multi-agent-fan-out candidates. Re-enlargement (debugging-fan-out + clinical-methodology gap-fills, plus any further author-history mining) is **conditional on positive signal in 3.4**. Update anonymization mapping in `findings.md` if new third-party names surface in any future enlargement.
 
-**Demoable for sub-stage:** `dataset.ts` exports ≥20 entries with sources cited; `findings.md` "Deferred / gap list" items 1, 2, 4, 5 closed.
+**Demoable for sub-stage:** `dataset.ts` exports 13 entries (partial dataset, flagged as such) with sources cited; `findings.md` "Deferred / gap list" items 1, 2, 4 closed; item 5 reframed to conditional re-enlargement.
 
 ## 3.3 [ ] Multi-turn harness wiring
 
