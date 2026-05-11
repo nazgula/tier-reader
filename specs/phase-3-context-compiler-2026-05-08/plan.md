@@ -1,6 +1,6 @@
 # Phase 3 — Plan
 
-Status: 1 [x], 2 [x], 3 [~] (3.1 [x], 3.2 [x], 3.3 [x], 3.4 [ ]), 4 [ ], 5 [ ], 6 [ ]
+Status: 1 [x], 2 [x], 3 [~] (3.1 [x], 3.2 [x], 3.3 [x], 3.3.5 [ ], 3.4 [ ]), 4 [ ], 5 [ ], 6 [ ]
 
 ## 1. [x] Schema extension: tags + entities on nodes
 
@@ -67,6 +67,18 @@ The original sub-bullets of group 3 (dataset spec, agent rosters, run.ts orchest
 - Multi-turn signal section appended to `findings.md`.
 
 **Demoable for sub-stage:** `pnpm bench` no longer skips multi-turn entries; `results.json` contains a `multiTurn` section.
+
+## 3.3.5 [ ] Decompose prompt: tag/entity emission hardening
+
+Inserted mid-phase after the first 3.4 smoke-and-triage pass surfaced a Phase-1 invariant gap: `decompose()` against a real model emits `tags=[]` and `entities=[]` on every node, including on content with obvious named entities (Gemini, Whisper, FFmpeg, TypeScript) and obvious domain framing (refunds, FAQ, checkout, backend, frontend). Phase-1 group 1's test layer (`packages/core/test/decompose-tags-entities.test.ts`) only exercised passthrough through a canned-provider mock and never invoked the prompt against a model, so the under-emission shipped undetected. `route()`'s Step-A overlap filter is mechanically reachable but functionally dead until emission is fixed — `tier-hybrid` collapses to `tier-embed-only` via the 3.1 `fallbackOnEmpty` path on every cell. See `packages/context-compiler/benchmarks/findings.md` → "Open investigation — tag emission" for the captured dump-tags evidence.
+
+- Strengthen tag/entity guidance in `packages/core/src/prompt.ts`. Split the existing "OPTIONAL METADATA" block: keep `kind` as default-omit, promote `tags` / `entities` to a default-emit "SEMANTIC LABELS" section that names under-emission as the failure mode and gives concrete domain-label and named-entity examples aligned with the `agents.ts` filter vocabulary. Stay open-set — honor the architectural invariant in this plan's "Architecture impact" section that vocabulary is model-chosen, not controlled.
+- Add a real-model decompose test in `packages/core/test/` — proposed `decompose-prompt-emission.live.test.ts`, gated on an env flag (e.g. `LIVE_TESTS=1`) so it only runs when an Anthropic API key is available. Fixtures: (a) multi-domain technical content with named tools, (b) plain-English support FAQ framing, (c) a domain-neutral greeting/metadata fixture as a negative control. Asserts: for (a) and (b) the resulting tree has ≥1 distinct tag and ≥1 distinct named entity across leaves; for (c) zero required (emission must be content-conditional, not unconditional).
+- Confirm the existing canned-provider tests in `decompose-tags-entities.test.ts` still pass (the schema and passthrough contract are unchanged; this is verification, not edit).
+- Re-run `pnpm --filter @tier-reader/context-compiler bench:smoke -- --trace` and confirm `tier-hybrid` produces non-empty Step-A survivor counts on at least one (entry, agent) pair — i.e. that Step A's filter is now functionally reachable, not just a no-op short-circuited by the embedding fallback. If Step A still empties on every cell after the prompt change, stop and surface — the issue is deeper than emission framing.
+- Append a "Tag emission hardening" section to `packages/context-compiler/benchmarks/findings.md` with: pre-fix dump-tags evidence (zero tags/entities across smoke entries), the prompt change made, post-fix dump-tags evidence, and the post-fix bench:smoke trace counts.
+
+**Demoable for sub-stage:** dump-tags output on the 3.2 dataset shows non-empty tags/entities on domain-bearing leaves; `bench:smoke --trace` produces at least one `stepA>0` cell that is not driven by the `fallbackOnEmpty` path.
 
 ## 3.4 [ ] Real bench run + writeup
 

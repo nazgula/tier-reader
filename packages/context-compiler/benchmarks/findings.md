@@ -279,6 +279,48 @@ behaves as intended across the floor-met dataset.
 above. The pre-fix table stays in this document as historical record;
 it is *not* a published result.
 
+### Open investigation — tag emission (3.4 smoke triage, 2026-05-11)
+
+The first 3.4 smoke pass (1 entry × N=3 × 5 conditions × 3 agents, plus the
+2-entry multi-turn pass) shows `tier-hybrid` still collapsing to
+`tier-embed-only` via the 3.1 `fallbackOnEmpty` path on every cell. Trace
+output: `stepA=0` on all single-turn cells and on all turn-0 cells of
+`author-supercut-architecture-arc`, regardless of the lowercased-substring
+match landed in 3.1.
+
+A diagnostic decompose pass over the smoke entries (working-set script,
+not committed) printed every node's `tags` and `entities`:
+
+- `ai-fan-out-3-domains` decomposed to 3 leaves — one per domain (mobile
+  checkout render bug, POST /v1/refunds endpoint, partial-refund FAQ).
+  All three: `tags=[]`, `entities=[]`.
+- `author-supercut-architecture-arc` turn 0 decomposed to 9 nodes
+  covering TypeScript, Electron, Postgres, Gemini, Whisper, FFmpeg, the
+  Anthropic SDK, and the Super-Cut product itself. All nine:
+  `tags=[]`, `entities=[]`.
+- Concatenated turns 0–2 of the same arc: 7 nodes covering the same
+  technologies plus a portfolio CV ask. Same result.
+
+The decomposer is not emitting tags or entities at all on real-model
+calls. 3.1's lowercased-substring match in `countOverlap` is therefore
+unreachable — there is nothing to match against. The whole tier-* path
+is, in practice, an embedding-only system right now.
+
+Root cause: the v0.x `prompt.ts` block "OPTIONAL METADATA (set only when
+obvious; omit otherwise — do not pad)" framed `tags` and `entities` as
+default-omit. The model interprets that conservatively and emits
+nothing, even on content where the domain labels are obvious. The
+Phase-1 group-1 acceptance test
+(`packages/core/test/decompose-tags-entities.test.ts`) fed canned raw
+trees through a mock provider and verified passthrough only; it never
+invoked the prompt against a real model, so the under-emission shipped
+silently.
+
+Resolution: hardened prompt + real-model emission test land in **group
+3.3.5**, inserted into this phase's plan mid-stream. 3.4 is paused
+behind 3.3.5 — running a full bench against the current emission rate
+would burn budget on a documented null result.
+
 ## Threats to validity
 
 - **Synthetic dataset bias.** AI-generated entries reflect what we *expected* to
