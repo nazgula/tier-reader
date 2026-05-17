@@ -13,3 +13,17 @@ coverage/
 
 # Local-only notes (per-developer, never committed)
 *.local.md
+
+# Benchmark run outputs (regenerated each run)
+packages/context-compiler/benchmarks/results.json
+packages/context-compiler/benchmarks/.cache/
+
+# Raw uncurated chat sources — kept locally as input for dataset curation.
+# Anonymized snippets get extracted into
+# packages/context-compiler/benchmarks/dataset.ts; the raw files contain
+# personal data and must never be committed. Verified clean: `git log
+# --diff-filter=A -- examples/maria-chats/ examples/tier-reader-benchmark-picks*`
+# returned empty at the 3.2 batch 1 commit.
+examples/maria-chats/
+examples/tier-reader-benchmark-picks-examples/
+examples/tier-reader-benchmark-picks.md

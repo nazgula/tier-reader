@@ -1,0 +1,578 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { aiSdkProvider, decompose } from "@tier-reader/core";
+import { type Embedder, cachedEmbedder, voyageEmbedder } from "../src/index.js";
+import { ROSTERS, type RosterSize } from "./agents.js";
+import { type AgentSlice, type ConditionId, buildSlices } from "./conditions.js";
+import {
+  DATASET,
+  type DatasetEntry,
+  MULTI_TURN_ENTRIES,
+  type MultiTurnEntry,
+} from "./dataset.js";
+import {
+  DEFAULT_BUDGETS,
+  TokenBudgetExceededError,
+  budgetedEmbedder,
+  budgetedRunner,
+} from "./guards.js";
+import {
+  type JudgeVerdict,
+  buildOutputPrompt,
+  buildPropagationPrompt,
+  buildSteeringPrompt,
+  parseVerdict,
+} from "./judge-prompts.js";
+import { BENCH_MODELS, type LLMRunner, anthropicRunner } from "./runner.js";
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+const CONDITIONS: ConditionId[] = [
+  "flat-broadcast",
+  "dacs-focus",
+  "tier-hybrid",
+  "tier-filter-only",
+  "tier-embed-only",
+];
+
+const DEFAULT_BUDGET = Number(process.env.BENCH_BUDGET ?? 500);
+const DEFAULT_ROSTERS: RosterSize[] = [3, 5, 10];
+
+interface CellResult {
+  entryId: string;
+  rosterSize: RosterSize;
+  condition: ConditionId;
+  agentId: string;
+  expected: boolean;
+  contextChars: number;
+  inputTokens: number;
+  outputTokens: number;
+  output: string;
+  steering: JudgeVerdict;
+  outputQuality: JudgeVerdict;
+}
+
+interface MultiTurnCellResult {
+  entryId: string;
+  atTurn: number;
+  rosterSize: RosterSize;
+  condition: ConditionId;
+  agentId: string;
+  expected: boolean;
+  contextChars: number;
+  inputTokens: number;
+  outputTokens: number;
+  output: string;
+  steering: JudgeVerdict;
+  outputQuality: JudgeVerdict;
+  propagation: JudgeVerdict | null;
+}
+
+interface BenchOutput {
+  generatedAt: string;
+  budget: number;
+  models: typeof BENCH_MODELS;
+  conditions: ConditionId[];
+  rosterSizes: RosterSize[];
+  cells: CellResult[];
+  multiTurn: { cells: MultiTurnCellResult[] };
+}
+
+export interface RunBenchOpts {
+  agentRunner: LLMRunner;
+  judgeRunner: LLMRunner;
+  embedder?: Embedder;
+  /** Optional override; defaults to all dataset entries. */
+  entries?: DatasetEntry[];
+  /** Optional override; defaults to all multi-turn entries. Pass `[]` to skip. */
+  multiTurnEntries?: MultiTurnEntry[];
+  rosterSizes?: RosterSize[];
+  budget?: number;
+  /** Where to write results.json. Default: benchmarks/results.json. */
+  outPath?: string;
+  /**
+   * If true and `outPath` already exists with previous cells, skip cells
+   * already present (matched on entryId+rosterSize+condition+agentId).
+   */
+  resume?: boolean;
+  /** Hook for progress logging (tests pass a no-op). */
+  log?: (msg: string) => void;
+  /** Decompose impl override — tests pass a stub to avoid live LLM calls. */
+  decomposeFn?: (text: string) => Promise<Awaited<ReturnType<typeof decompose>>>;
+  /**
+   * When true, log per-(entry, roster, condition, agent) Step A / Step B
+   * survivor counts to stderr. Used to diagnose `route()` filter behavior
+   * during the smoke-without-blind-faith pass.
+   */
+  trace?: boolean;
+}
+
+export async function runBench(opts: RunBenchOpts): Promise<BenchOutput> {
+  const log = opts.log ?? ((m: string) => process.stderr.write(`${m}\n`));
+  const entries = opts.entries ?? DATASET;
+  const multiTurnEntries = opts.multiTurnEntries ?? MULTI_TURN_ENTRIES;
+  const rosterSizes = opts.rosterSizes ?? DEFAULT_ROSTERS;
+  const budget = opts.budget ?? DEFAULT_BUDGET;
+  const outPath = opts.outPath ?? resolve(here, "results.json");
+  const decomposeFn = opts.decomposeFn ?? defaultDecompose;
+  const embedder = opts.embedder ?? defaultEmbedder();
+
+  const existing = opts.resume ? loadExisting(outPath) : { cells: [], multiTurn: [] };
+  const completed = new Set(existing.cells.map(cellKey));
+  const mtCompleted = new Set(existing.multiTurn.map(mtCellKey));
+  const cells: CellResult[] = [...existing.cells];
+  const mtCells: MultiTurnCellResult[] = [...existing.multiTurn];
+
+  if (opts.resume && (existing.cells.length > 0 || existing.multiTurn.length > 0)) {
+    log(
+      `[resume] loaded ${existing.cells.length} single-turn + ${existing.multiTurn.length} multi-turn cells from ${outPath}`,
+    );
+  }
+
+  try {
+    for (const entry of entries) {
+      log(`[entry] ${entry.id}`);
+      // Defer the per-entry decompose + DACS summary until at least one cell
+      // for this entry is *not* in the resume set — keeps resume cheap.
+      let tree: Awaited<ReturnType<typeof decompose>> | null = null;
+      let dacsSummary: string | null = null;
+
+      for (const N of rosterSizes) {
+        const roster = ROSTERS[N];
+        for (const cond of CONDITIONS) {
+          const remainingAgents = roster.filter(
+            (a) => !completed.has(makeKey(entry.id, N, cond, a.id)),
+          );
+          if (remainingAgents.length === 0) continue;
+
+          if (!tree) tree = await decomposeFn(entry.text);
+          if (dacsSummary === null) dacsSummary = await summarize(opts.agentRunner, entry.text);
+
+          const traceFn = opts.trace
+            ? (ev: import("../src/index.js").RouteTraceEvent) => {
+                process.stderr.write(
+                  `[trace] ${entry.id} N=${N} ${cond} ${ev.agentId} ` +
+                    `cand=${ev.candidateIds.length} stepA=${ev.stepASurvivorIds.length} ` +
+                    `stepB=${ev.stepBSurvivorIds.length}` +
+                    (ev.fallbackEngaged ? " (fallback)" : "") +
+                    "\n",
+                );
+              }
+            : undefined;
+
+          const slices = await buildSlices(cond, {
+            sourceMessage: entry.text,
+            tree,
+            roster,
+            embedder,
+            budget,
+            dacsSummary,
+            trace: traceFn,
+          });
+
+          for (const agent of remainingAgents) {
+            const slice = slices.find((s) => s.agentId === agent.id);
+            if (!slice) continue;
+
+            const cell = await runOneCell({
+              entry,
+              agent,
+              slice,
+              condition: cond,
+              rosterSize: N,
+              agentRunner: opts.agentRunner,
+              judgeRunner: opts.judgeRunner,
+            });
+            cells.push(cell);
+            completed.add(cellKey(cell));
+            // Persist after each cell so a budget-exceeded crash doesn't lose work.
+            persist(outPath, makeOutput(budget, rosterSizes, cells, mtCells));
+            log(
+              `  N=${N} ${cond} ${agent.id} steering=${cell.steering.score} output=${cell.outputQuality.score}`,
+            );
+          }
+        }
+      }
+    }
+
+    for (const mtEntry of multiTurnEntries) {
+      log(`[multi-turn] ${mtEntry.id}`);
+      for (const ev of mtEntry.evaluations) {
+        // Combined text = all turns 0..atTurn separated by explicit markers,
+        // so the decomposer can see the turn boundaries.
+        const combinedText = mtEntry.turns
+          .filter((t) => t.turnIndex <= ev.atTurn)
+          .map((t) => `Turn ${t.turnIndex}:\n${t.text}`)
+          .join("\n\n");
+
+        let tree: Awaited<ReturnType<typeof decompose>> | null = null;
+        let dacsSummary: string | null = null;
+
+        for (const N of rosterSizes) {
+          const roster = ROSTERS[N];
+          for (const cond of CONDITIONS) {
+            const remainingAgents = roster.filter(
+              (a) => !mtCompleted.has(makeMTKey(mtEntry.id, ev.atTurn, N, cond, a.id)),
+            );
+            if (remainingAgents.length === 0) continue;
+
+            if (!tree) tree = await decomposeFn(combinedText);
+            if (dacsSummary === null) {
+              dacsSummary = await summarize(opts.agentRunner, combinedText);
+            }
+
+            const slices = await buildSlices(cond, {
+              sourceMessage: combinedText,
+              tree,
+              roster,
+              embedder,
+              budget,
+              dacsSummary,
+            });
+
+            for (const agent of remainingAgents) {
+              const slice = slices.find((s) => s.agentId === agent.id);
+              if (!slice) continue;
+
+              const cell = await runOneMultiTurnCell({
+                entry: mtEntry,
+                evaluation: ev,
+                agent,
+                slice,
+                condition: cond,
+                rosterSize: N,
+                combinedText,
+                agentRunner: opts.agentRunner,
+                judgeRunner: opts.judgeRunner,
+              });
+              mtCells.push(cell);
+              mtCompleted.add(mtCellKey(cell));
+              persist(outPath, makeOutput(budget, rosterSizes, cells, mtCells));
+              const propScore = cell.propagation ? cell.propagation.score : "-";
+              log(
+                `  turn=${ev.atTurn} N=${N} ${cond} ${agent.id} ` +
+                  `steering=${cell.steering.score} output=${cell.outputQuality.score} prop=${propScore}`,
+              );
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    if (err instanceof TokenBudgetExceededError) {
+      log(`[abort] ${err.message} — partial results preserved at ${outPath}`);
+    }
+    throw err;
+  }
+
+  const out = makeOutput(budget, rosterSizes, cells, mtCells);
+  persist(outPath, out);
+  log(
+    `[done] wrote ${outPath} (${cells.length} single-turn + ${mtCells.length} multi-turn cells)`,
+  );
+  return out;
+}
+
+function makeOutput(
+  budget: number,
+  rosterSizes: RosterSize[],
+  cells: CellResult[],
+  mtCells: MultiTurnCellResult[],
+): BenchOutput {
+  return {
+    generatedAt: new Date().toISOString(),
+    budget,
+    models: BENCH_MODELS,
+    conditions: CONDITIONS,
+    rosterSizes,
+    cells,
+    multiTurn: { cells: mtCells },
+  };
+}
+
+function persist(outPath: string, out: BenchOutput): void {
+  mkdirSync(dirname(outPath), { recursive: true });
+  writeFileSync(outPath, JSON.stringify(out, null, 2));
+}
+
+function loadExisting(outPath: string): { cells: CellResult[]; multiTurn: MultiTurnCellResult[] } {
+  if (!existsSync(outPath)) return { cells: [], multiTurn: [] };
+  try {
+    const parsed = JSON.parse(readFileSync(outPath, "utf8")) as Partial<BenchOutput>;
+    const cells = Array.isArray(parsed.cells) ? (parsed.cells as CellResult[]) : [];
+    const multiTurn =
+      parsed.multiTurn && Array.isArray(parsed.multiTurn.cells)
+        ? (parsed.multiTurn.cells as MultiTurnCellResult[])
+        : [];
+    return { cells, multiTurn };
+  } catch {
+    return { cells: [], multiTurn: [] };
+  }
+}
+
+function cellKey(c: { entryId: string; rosterSize: RosterSize; condition: ConditionId; agentId: string }): string {
+  return makeKey(c.entryId, c.rosterSize, c.condition, c.agentId);
+}
+
+function makeKey(
+  entryId: string,
+  rosterSize: RosterSize,
+  condition: ConditionId,
+  agentId: string,
+): string {
+  return `${entryId}|${rosterSize}|${condition}|${agentId}`;
+}
+
+function mtCellKey(c: {
+  entryId: string;
+  atTurn: number;
+  rosterSize: RosterSize;
+  condition: ConditionId;
+  agentId: string;
+}): string {
+  return makeMTKey(c.entryId, c.atTurn, c.rosterSize, c.condition, c.agentId);
+}
+
+function makeMTKey(
+  entryId: string,
+  atTurn: number,
+  rosterSize: RosterSize,
+  condition: ConditionId,
+  agentId: string,
+): string {
+  return `${entryId}@${atTurn}|${rosterSize}|${condition}|${agentId}`;
+}
+
+async function defaultDecompose(text: string) {
+  const provider = aiSdkProvider();
+  return decompose(text, { provider });
+}
+
+function defaultEmbedder(): Embedder {
+  return budgetedEmbedder(
+    cachedEmbedder(voyageEmbedder(), {
+      path: resolve(here, ".cache/embed.json"),
+      namespace: "voyage-3-lite",
+    }),
+    { maxTokens: DEFAULT_BUDGETS.embedderTokens },
+  );
+}
+
+async function summarize(runner: LLMRunner, text: string): Promise<string> {
+  const { text: summary } = await runner.run({
+    systemPrompt:
+      "You compress messages into 200-token summaries that preserve all task-relevant content. No commentary.",
+    userPrompt: `Summarize the following message in at most 200 tokens, preserving every distinct task, request, or decision. Return only the summary.\n\n"""\n${text}\n"""`,
+    temperature: 0,
+  });
+  return summary.trim();
+}
+
+async function runOneCell(args: {
+  entry: DatasetEntry;
+  agent: { id: string; description: string; systemPrompt: string };
+  slice: AgentSlice;
+  condition: ConditionId;
+  rosterSize: RosterSize;
+  agentRunner: LLMRunner;
+  judgeRunner: LLMRunner;
+}): Promise<CellResult> {
+  const { entry, agent, slice, condition, rosterSize } = args;
+  const expected = entry.expectedAgents.includes(agent.id);
+  const expectedTask =
+    entry.expectedTasks.find((t) => t.agentId === agent.id)?.expectedTask ?? "(no expected task)";
+
+  let agentText = "";
+  let inputTokens = 0;
+  let outputTokens = 0;
+  if (slice.text.trim().length > 0) {
+    const result = await args.agentRunner.run({
+      systemPrompt: agent.systemPrompt,
+      userPrompt: slice.text,
+      temperature: 0,
+    });
+    agentText = result.text;
+    inputTokens = result.inputTokens;
+    outputTokens = result.outputTokens;
+  }
+
+  const steering = await judge(args.judgeRunner, "steering", {
+    sourceMessage: entry.text,
+    agentId: agent.id,
+    agentDescription: agent.description,
+    expectedTask,
+    contextGiven: slice.text,
+  });
+
+  const outputQuality = await judge(args.judgeRunner, "output", {
+    sourceMessage: entry.text,
+    agentId: agent.id,
+    agentDescription: agent.description,
+    expectedTask,
+    contextGiven: slice.text,
+    agentOutput: agentText,
+  });
+
+  return {
+    entryId: entry.id,
+    rosterSize,
+    condition,
+    agentId: agent.id,
+    expected,
+    contextChars: slice.text.length,
+    inputTokens,
+    outputTokens,
+    output: agentText,
+    steering,
+    outputQuality,
+  };
+}
+
+async function judge(
+  runner: LLMRunner,
+  kind: "steering" | "output",
+  input: Parameters<typeof buildSteeringPrompt>[0],
+): Promise<JudgeVerdict> {
+  const prompt = kind === "steering" ? buildSteeringPrompt(input) : buildOutputPrompt(input);
+  const { text } = await runner.run({
+    systemPrompt:
+      "You are a strict evaluator. Respond with valid JSON only — no commentary, no code fences.",
+    userPrompt: prompt,
+    model: BENCH_MODELS.judge,
+    temperature: 0,
+  });
+  return parseVerdict(text);
+}
+
+async function judgePropagation(
+  runner: LLMRunner,
+  input: Parameters<typeof buildPropagationPrompt>[0],
+): Promise<JudgeVerdict> {
+  const { text } = await runner.run({
+    systemPrompt:
+      "You are a strict evaluator. Respond with valid JSON only — no commentary, no code fences.",
+    userPrompt: buildPropagationPrompt(input),
+    model: BENCH_MODELS.judge,
+    temperature: 0,
+  });
+  return parseVerdict(text);
+}
+
+async function runOneMultiTurnCell(args: {
+  entry: MultiTurnEntry;
+  evaluation: MultiTurnEntry["evaluations"][number];
+  agent: { id: string; description: string; systemPrompt: string };
+  slice: AgentSlice;
+  condition: ConditionId;
+  rosterSize: RosterSize;
+  combinedText: string;
+  agentRunner: LLMRunner;
+  judgeRunner: LLMRunner;
+}): Promise<MultiTurnCellResult> {
+  const { entry, evaluation, agent, slice, condition, rosterSize, combinedText } = args;
+  const expected = evaluation.expectedAgents.includes(agent.id);
+  const expectedTask =
+    evaluation.expectedTasks.find((t) => t.agentId === agent.id)?.expectedTask ??
+    "(no expected task)";
+
+  let agentText = "";
+  let inputTokens = 0;
+  let outputTokens = 0;
+  if (slice.text.trim().length > 0) {
+    const result = await args.agentRunner.run({
+      systemPrompt: agent.systemPrompt,
+      userPrompt: slice.text,
+      temperature: 0,
+    });
+    agentText = result.text;
+    inputTokens = result.inputTokens;
+    outputTokens = result.outputTokens;
+  }
+
+  const steering = await judge(args.judgeRunner, "steering", {
+    sourceMessage: combinedText,
+    agentId: agent.id,
+    agentDescription: agent.description,
+    expectedTask,
+    contextGiven: slice.text,
+  });
+
+  const outputQuality = await judge(args.judgeRunner, "output", {
+    sourceMessage: combinedText,
+    agentId: agent.id,
+    agentDescription: agent.description,
+    expectedTask,
+    contextGiven: slice.text,
+    agentOutput: agentText,
+  });
+
+  // Propagation judge only applies when there's prior context to propagate
+  // (i.e. atTurn > 0 with non-empty requiredPriorContext). For the seed turn
+  // there's nothing to propagate and we record null rather than fabricating
+  // a perfect score.
+  const propagation =
+    evaluation.requiredPriorContext.length > 0
+      ? await judgePropagation(args.judgeRunner, {
+          agentId: agent.id,
+          agentDescription: agent.description,
+          requiredPriorContext: evaluation.requiredPriorContext,
+          contextGiven: slice.text,
+        })
+      : null;
+
+  return {
+    entryId: entry.id,
+    atTurn: evaluation.atTurn,
+    rosterSize,
+    condition,
+    agentId: agent.id,
+    expected,
+    contextChars: slice.text.length,
+    inputTokens,
+    outputTokens,
+    output: agentText,
+    steering,
+    outputQuality,
+    propagation,
+  };
+}
+
+// CLI entry — `tsx benchmarks/run.ts [--smoke] [--resume]`
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+if (isMain) {
+  const argv = process.argv.slice(2);
+  const smoke = argv.includes("--smoke");
+  const resume = argv.includes("--resume");
+  const trace = argv.includes("--trace");
+
+  const baseRunner = anthropicRunner({ defaultModel: BENCH_MODELS.agent });
+  const guarded = budgetedRunner(baseRunner, {
+    maxInputTokens: DEFAULT_BUDGETS.llmInputTokens,
+    maxOutputTokens: DEFAULT_BUDGETS.llmOutputTokens,
+    onSpend: ({ inputTokens, outputTokens }) => {
+      if ((inputTokens + outputTokens) % 50_000 < 5_000) {
+        process.stderr.write(`[spend] in=${inputTokens} out=${outputTokens}\n`);
+      }
+    },
+  });
+
+  const subset = smoke
+    ? {
+        entries: DATASET.slice(0, 1),
+        multiTurnEntries: MULTI_TURN_ENTRIES.slice(0, 1),
+        rosterSizes: [3] as RosterSize[],
+      }
+    : {};
+
+  runBench({
+    agentRunner: guarded,
+    judgeRunner: guarded,
+    resume,
+    trace,
+    ...subset,
+  }).catch((err) => {
+    process.stderr.write(`bench failed: ${err instanceof Error ? err.stack : String(err)}\n`);
+    process.exit(1);
+  });
+}

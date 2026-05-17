@@ -1,0 +1,36 @@
+{
+  "name": "@tier-reader/context-compiler",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "bench": "tsx --env-file=../../.env.local benchmarks/run.ts",
+    "bench:smoke": "tsx --env-file=../../.env.local benchmarks/run.ts --smoke",
+    "bench:resume": "tsx --env-file=../../.env.local benchmarks/run.ts --resume"
+  },
+  "dependencies": {
+    "@tier-reader/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@ai-sdk/anthropic": "^1.0.6",
+    "@types/node": "^22.10.5",
+    "ai": "^4.0.27",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
