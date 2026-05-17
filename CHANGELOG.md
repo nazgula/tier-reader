@@ -2,6 +2,16 @@
 
 User-visible changes per phase. Newest first.
 
+## 2026-05-18 — Phase 3: Context-compiler library + benchmark (routing experiment, closed early)
+
+- New `packages/context-compiler/` workspace package with `route(tree, agent, opts?)` (hybrid filter + Voyage cosine-similarity rank, with 3.1 lowercased-substring relaxation and `fallbackOnEmpty` default) and `compile(nodes, budget, format)` (budget-fitting depth walk with `bullets` / `prose` output formats). `AgentSpec` shape `{ id, domain, description, tagFilters?, entityFilters? }`.
+- Optional `tags?: string[]` and `entities?: string[]` on `Node` in `@tier-reader/core`. Decompose prompt was extended to emit them. The schema fields are retained for future router consumers but `core` itself does not consume them in v1.
+- Benchmark harness under `packages/context-compiler/benchmarks/` — five conditions (`flat-broadcast`, `dacs-focus`, `tier-hybrid`, `tier-filter-only`, `tier-embed-only`), three roster sizes (N=3, 5, 10), 13-entry curated dataset (11 single-turn + 2 multi-turn including a Hebrew BringUp arc), three judges (steering, output-quality, propagation), cost guards with hard token caps, content-hash embedding cache, resume support, `--trace` flag for per-cell step-A/step-B logging.
+- **Closed early 2026-05-17.** The routing experiment did not produce a defensible win. Three structural blockers surfaced: multi-agent fan-out is structurally rare in public chat dumps (3.2 already conceded this and shipped 13 entries instead of the originally-targeted ≥20); open-set tag emission cannot reliably align with arbitrary downstream agent filters (the 3.4 smoke triage found `decompose()` against a real model emits `tags=[]`/`entities=[]` on every node, and the canned-provider unit tests missed it); multi-turn propagation in the smoke trended worse than `flat-broadcast` (N=1, wrong direction on the central thesis). Decision: ship the durable tier structure as v1, treat sub-turn routing as a research direction. Routing code remains in the repo as research artifact; it is **not** part of the v1 NPM-published surface.
+- Full `pnpm bench` was never run; only the smoke (`pnpm bench:smoke`) executed. The investigation record lives in `specs/phase-3-context-compiler-2026-05-08/plan.md` (group 3.4 archived) and `packages/context-compiler/benchmarks/findings.md` ("Open investigation — tag emission" section).
+- Salvaged: the long-AI-chat decomposition + reflection-agent eval (originally Phase 3 plan.md group 5, pure tier-structure work) moves to **Phase 3.1** in the roadmap. NPM publish prep moves to "Deferred / Under Evaluation" with a clear trigger; LinkedIn post #1 (Phase 4) rethemed around the engine itself.
+- Architecture: new invariants in `docs/architecture.md` recording (a) v1 published surface ≠ in-tree code, (b) decompose prompt-emission invariants are not gated by unit tests (broader gap tracked under roadmap → Deferred → *Automated output-quality tests / real-model prompt gate*).
+
 ## 2026-05-07 — Phase 2.5: Agent tactics deep dive (research + experimentation)
 
 - Surveyed prior art on long-document decomposition and progressive disclosure (hierarchical summarization, RAPTOR, BooookScore, NexusSum, Anthropic context engineering, NN/g progressive disclosure). Findings written up at `specs/phase-2_5-.../findings.md`.

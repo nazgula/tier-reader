@@ -73,6 +73,4 @@ Locked decisions for the engine. Full schema lives in `docs/schema.md`; function
 
 ## Open questions
 
-- [phase 3] **NPM scope and final package names** — `@tier-reader/core` tentative; verify scope availability and pick before publish.
-- [phase 3] **License (MIT vs Apache 2.0)** — must be decided before phase 3 publish gate. Default leaning: MIT.
-- [phase 3] **Langfuse free-tier limits + retention** — confirm volume + retention adequate when wiring traces; not a foundation question.
+- [deferred / npm-publish] **NPM scope and final package names** — `@tier-reader/core` tentative; verify scope availability and pick before publish. Was tagged `[phase 3]` until the 2026-05-17 pivot moved publish-prep to "Deferred / Under Evaluation" in `roadmap.md`; resolved when that Deferred item is pulled in.
